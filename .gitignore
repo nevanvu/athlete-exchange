@@ -23,3 +23,6 @@ out/
 ### Frontend (later) ###
 node_modules/
 frontend/dist/
+
+### jqwik ###
+.jqwik-database
