@@ -1,11 +1,14 @@
 package com.athletex.market;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Slate state machine per docs/slate-lifecycle.md. Transitions lock the slate row,
@@ -21,15 +24,18 @@ public class SlateLifecycleService {
     private final GameRepository gameRepository;
     private final AthleteMarketRepository marketRepository;
     private final SlateTransitionRepository transitionRepository;
+    private final List<SlateLifecycleHooks> hooks;
 
     public SlateLifecycleService(SlateRepository slateRepository,
                                  GameRepository gameRepository,
                                  AthleteMarketRepository marketRepository,
-                                 SlateTransitionRepository transitionRepository) {
+                                 SlateTransitionRepository transitionRepository,
+                                 List<SlateLifecycleHooks> hooks) {
         this.slateRepository = slateRepository;
         this.gameRepository = gameRepository;
         this.marketRepository = marketRepository;
         this.transitionRepository = transitionRepository;
+        this.hooks = hooks;
     }
 
     /**
@@ -59,10 +65,35 @@ public class SlateLifecycleService {
             checkGuard(slate, to);
         }
 
+        switch (to) {
+            case OPEN_MARKET -> hooks.forEach(h -> h.onIpoClosing(slateId));
+            case CLOSED -> afterCommit(() -> hooks.forEach(h -> h.onSlateClosed(slateId)));
+            case VOIDED -> {
+                hooks.forEach(h -> h.onSlateVoiding(slateId));
+                afterCommit(() -> hooks.forEach(h -> h.onSlateVoided(slateId)));
+            }
+            default -> {
+            }
+        }
+
         slate.setStatus(to);
         transitionRepository.save(new SlateTransitionEntity(slateId, from, to, trigger));
         log.info("slate {} transitioned {} -> {} ({})", slateId, from, to, trigger);
         return true;
+    }
+
+    /**
+     * Order cleanup must run after the status change is visible: orders are placed under an
+     * in-memory market lock, so once CLOSED is committed no new order can slip in, and every
+     * order that committed before is still in the DB to be cancelled.
+     */
+    private static void afterCommit(Runnable action) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     private void checkGuard(SlateEntity slate, SlateStatus to) {

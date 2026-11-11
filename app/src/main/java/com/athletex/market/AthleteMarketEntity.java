@@ -39,6 +39,12 @@ public class AthleteMarketEntity {
     @Column(name = "total_shares", nullable = false)
     private int totalShares;
 
+    @Column(name = "ipo_clearing_price_cents")
+    private Long ipoClearingPriceCents;
+
+    @Column(name = "last_trade_price_cents")
+    private Long lastTradePriceCents;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -92,6 +98,22 @@ public class AthleteMarketEntity {
 
     public int getTotalShares() {
         return totalShares;
+    }
+
+    public Long getIpoClearingPriceCents() {
+        return ipoClearingPriceCents;
+    }
+
+    public void setIpoClearingPriceCents(Long ipoClearingPriceCents) {
+        this.ipoClearingPriceCents = ipoClearingPriceCents;
+    }
+
+    public Long getLastTradePriceCents() {
+        return lastTradePriceCents;
+    }
+
+    public void setLastTradePriceCents(Long lastTradePriceCents) {
+        this.lastTradePriceCents = lastTradePriceCents;
     }
 
     public Instant getCreatedAt() {

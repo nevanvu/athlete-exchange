@@ -85,14 +85,14 @@ public class LedgerService {
         if (amountCents == 0) {
             throw new IllegalArgumentException("amount must be non-zero");
         }
-        UUID cash = requireAccount(userId, AccountType.USER_CASH);
-        UUID escrow = requireAccount(userId, AccountType.USER_ESCROW);
+        UUID cash = accountIdOf(userId, AccountType.USER_CASH);
+        UUID escrow = accountIdOf(userId, AccountType.USER_ESCROW);
         return post(idempotencyKey, type, List.of(
                 new Posting(cash, -amountCents),
                 new Posting(escrow, amountCents)));
     }
 
-    private UUID requireAccount(UUID userId, AccountType type) {
+    public UUID accountIdOf(UUID userId, AccountType type) {
         return accountRepository.findByOwnerUserIdAndType(userId, type)
                 .map(AccountEntity::getId)
                 .orElseThrow(() -> new IllegalArgumentException("user %s has no %s account".formatted(userId, type)));
