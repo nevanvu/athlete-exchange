@@ -82,3 +82,17 @@ Run the tests (Testcontainers spins up its own Postgres):
 ```bash
 ./gradlew build
 ```
+
+### Scripted demo
+
+Start the server with a short IPO window, then run the walkthrough client (standard-library Python). It registers three paper-money traders, bids in the demo slate's IPO, waits for the auction to clear, trades on the open market, and prints the resulting portfolios and P&L.
+
+```bash
+./gradlew :app:bootRun --args='--athletex.demo-seed.ipo-opens-in=25s --athletex.demo-seed.ipo-duration=80s --athletex.scheduler.fixed-delay-ms=2000'
+```
+
+```bash
+python3 scripts/demo.py
+```
+
+To replay it, reset the database first with `docker compose down -v`.
