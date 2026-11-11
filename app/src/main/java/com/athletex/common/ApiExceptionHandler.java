@@ -1,6 +1,8 @@
 package com.athletex.common;
 
 import com.athletex.ledger.InsufficientFundsException;
+import com.athletex.trading.InsufficientSharesException;
+import com.athletex.trading.TradingRejectedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -32,9 +34,14 @@ public class ApiExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
     }
 
-    @ExceptionHandler(InsufficientFundsException.class)
-    ProblemDetail onInsufficientFunds(InsufficientFundsException e) {
+    @ExceptionHandler({InsufficientFundsException.class, InsufficientSharesException.class})
+    ProblemDetail onInsufficientFunds(RuntimeException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
+    @ExceptionHandler({TradingRejectedException.class, IllegalStateException.class})
+    ProblemDetail onRejected(RuntimeException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
     }
 
     @ExceptionHandler(BadCredentialsException.class)
