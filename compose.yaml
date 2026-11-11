@@ -13,13 +13,16 @@ services:
       timeout: 3s
       retries: 10
 
+  # Redis and Kafka arrive with the live-data layer (M5+); enable with COMPOSE_PROFILES=streaming.
   redis:
     image: redis:7
+    profiles: ["streaming"]
     ports:
       - "6379:6379"
 
   kafka:
     image: apache/kafka:4.1.0
+    profiles: ["streaming"]
     ports:
       - "9092:9092"
     environment:
