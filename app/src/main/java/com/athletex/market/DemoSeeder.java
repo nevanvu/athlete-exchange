@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -39,15 +40,21 @@ public class DemoSeeder implements ApplicationRunner {
     private final AthleteRepository athleteRepository;
     private final SlateRepository slateRepository;
     private final SlateSetupService setupService;
+    private final Duration ipoOpensIn;
+    private final Duration ipoDuration;
 
     public DemoSeeder(TeamRepository teamRepository,
                       AthleteRepository athleteRepository,
                       SlateRepository slateRepository,
-                      SlateSetupService setupService) {
+                      SlateSetupService setupService,
+                      @Value("${athletex.demo-seed.ipo-opens-in:1m}") Duration ipoOpensIn,
+                      @Value("${athletex.demo-seed.ipo-duration:30m}") Duration ipoDuration) {
         this.teamRepository = teamRepository;
         this.athleteRepository = athleteRepository;
         this.slateRepository = slateRepository;
         this.setupService = setupService;
+        this.ipoOpensIn = ipoOpensIn;
+        this.ipoDuration = ipoDuration;
     }
 
     @Override
@@ -63,13 +70,13 @@ public class DemoSeeder implements ApplicationRunner {
             teams.add(teamRepository.save(new TeamEntity(t[0], t[1])));
         }
 
-        Instant now = Instant.now();
-        SlateEntity slate = setupService.createSlate(
-                "Demo Slate — Opening Night", now.plus(Duration.ofMinutes(1)), now.plus(Duration.ofMinutes(30)));
+        Instant ipoOpens = Instant.now().plus(ipoOpensIn);
+        Instant ipoCloses = ipoOpens.plus(ipoDuration);
+        SlateEntity slate = setupService.createSlate("Demo Slate — Opening Night", ipoOpens, ipoCloses);
         GameEntity game1 = setupService.addGame(slate.getId(), teams.get(0).getId(), teams.get(1).getId(),
-                now.plus(Duration.ofMinutes(35)));
+                ipoCloses.plus(Duration.ofMinutes(5)));
         GameEntity game2 = setupService.addGame(slate.getId(), teams.get(2).getId(), teams.get(3).getId(),
-                now.plus(Duration.ofMinutes(40)));
+                ipoCloses.plus(Duration.ofMinutes(10)));
 
         int n = 0;
         for (TeamEntity team : teams) {

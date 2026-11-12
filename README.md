@@ -77,8 +77,44 @@ Requires Java 21+ and Docker.
 ./gradlew :app:bootRun   # starts postgres/redis/kafka via Docker Compose automatically
 ```
 
-Run the tests (Testcontainers spins up its own Postgres):
+Run the tests (Testcontainers spins up its own Postgres and Kafka):
 
 ```bash
 ./gradlew build
 ```
+
+### Scripted demo
+
+Start the server with a short IPO window, then run the walkthrough client (standard-library Python). It registers three paper-money traders, bids in the demo slate's IPO, waits for the auction to clear, trades on the open market, and prints the resulting portfolios and P&L.
+
+```bash
+./gradlew :app:bootRun --args='--athletex.demo-seed.ipo-opens-in=25s --athletex.demo-seed.ipo-duration=80s --athletex.scheduler.fixed-delay-ms=2000'
+```
+
+```bash
+python3 scripts/demo.py
+```
+
+To replay it, reset the database first with `docker compose down -v`.
+
+### Game simulator
+
+The `simulator` module is a separate Spring Boot app (port 8081) that plays NBA games and streams the events in `docs/event-schema.md` to the `game-events` Kafka topic. The exchange consumes that topic, de-duplicates by event id, reorders by per-game sequence, and applies stat lines, game clock, injuries and news. When a slate's last game goes FINAL, the slate closes and resting orders are cancelled.
+
+```bash
+./gradlew :simulator:bootRun
+```
+
+Start a game for a slate (`gameId`, `slateId` and athlete ids come from `GET /api/slates/{id}`). `speed` 60 plays a 48-minute game in 48 seconds, and a fixed `seed` replays the same game:
+
+```bash
+curl -s localhost:8081/simulations -H 'Content-Type: application/json' -d '{"gameId":"<game-uuid>","slateId":"<slate-uuid>","speed":60,"seed":7,"athletes":[{"athleteId":"<athlete-uuid>","projectedFantasyPoints":42,"projectedMinutes":34}]}'
+```
+
+Inject an injury or a news item mid-game:
+
+```bash
+curl -s localhost:8081/simulations/<game-uuid>/injury -H 'Content-Type: application/json' -d '{"athleteId":"<athlete-uuid>","status":"OUT","detail":"ankle"}'
+```
+
+Set `athletex.simulator.record-dir` to also write each game's events as NDJSON for replay.

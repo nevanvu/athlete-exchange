@@ -78,6 +78,7 @@ public class SlateLifecycleService {
 
         slate.setStatus(to);
         transitionRepository.save(new SlateTransitionEntity(slateId, from, to, trigger));
+        hooks.forEach(h -> h.onTransition(slateId, from, to, trigger));
         log.info("slate {} transitioned {} -> {} ({})", slateId, from, to, trigger);
         return true;
     }
@@ -137,16 +138,23 @@ public class SlateLifecycleService {
 
     /**
      * Records a game status change and closes the slate when its last game goes FINAL.
-     * This is the hook the ingestion pipeline (M5) will call on game_status events.
+     * Called by event ingestion inside its transaction, so it must not throw for an
+     * expected situation: a slate that is not trading yet simply stays where it is.
      */
     @Transactional
     public void recordGameStatus(UUID gameId, GameStatus status, String trigger) {
         GameEntity game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new IllegalArgumentException("unknown game " + gameId));
         game.setStatus(status);
-        if (status == GameStatus.FINAL
-                && gameRepository.countBySlateIdAndStatusNot(game.getSlateId(), GameStatus.FINAL) == 0) {
+        if (status != GameStatus.FINAL
+                || gameRepository.countBySlateIdAndStatusNot(game.getSlateId(), GameStatus.FINAL) > 0) {
+            return;
+        }
+        SlateStatus slateStatus = slateRepository.findById(game.getSlateId()).orElseThrow().getStatus();
+        if (slateStatus == SlateStatus.OPEN_MARKET) {
             transition(game.getSlateId(), SlateStatus.CLOSED, trigger);
+        } else if (slateStatus.order() < SlateStatus.OPEN_MARKET.order() && !slateStatus.isTerminal()) {
+            log.warn("all games in slate {} are FINAL but the slate is {}; not closing", game.getSlateId(), slateStatus);
         }
     }
 
