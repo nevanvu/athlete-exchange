@@ -22,6 +22,8 @@ public interface PositionRepository extends JpaRepository<PositionEntity, UUID> 
 
     List<PositionEntity> findByMarketId(UUID marketId);
 
+    List<PositionEntity> findByUserId(UUID userId);
+
     @Query("select coalesce(sum(p.quantity), 0) from PositionEntity p where p.marketId = :marketId")
     long totalSharesInMarket(@Param("marketId") UUID marketId);
 }

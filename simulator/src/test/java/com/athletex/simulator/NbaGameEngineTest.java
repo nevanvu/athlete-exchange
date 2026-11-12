@@ -82,9 +82,11 @@ class NbaGameEngineTest {
         }
         assertThat(finals).containsOnlyKeys("star", "starter", "bench");
         assertThat(finals.values()).containsOnly(1);
-        // Final lines are the last stat events of the stream.
-        List<EventEnvelope> tail = events.subList(events.size() - 3, events.size());
-        assertThat(tail).allSatisfy(e -> assertThat(((EventPayload.StatLine) e.payload()).isFinal()).isTrue());
+        // The box score comes in just before the final whistle, which ends the stream.
+        assertThat(events.get(events.size() - 1).payload())
+                .isEqualTo(new EventPayload.GameStatus(EventPayload.GameState.FINAL, 4, 0));
+        List<EventEnvelope> boxScore = events.subList(events.size() - 4, events.size() - 1);
+        assertThat(boxScore).allSatisfy(e -> assertThat(((EventPayload.StatLine) e.payload()).isFinal()).isTrue());
     }
 
     @Test

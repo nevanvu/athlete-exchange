@@ -9,9 +9,16 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.DynamicUpdate;
 
+/**
+ * Written concurrently by trading (last trade price), fair value and settlement, each touching
+ * different columns in separate transactions; dynamic updates keep one writer from overwriting
+ * another's columns with the stale values it loaded.
+ */
 @Entity
 @Table(name = "athlete_markets")
+@DynamicUpdate
 public class AthleteMarketEntity {
 
     @Id
@@ -44,6 +51,21 @@ public class AthleteMarketEntity {
 
     @Column(name = "last_trade_price_cents")
     private Long lastTradePriceCents;
+
+    @Column(name = "fair_value_cents")
+    private Long fairValueCents;
+
+    @Column(name = "fair_value_as_of_event_id")
+    private String fairValueAsOfEventId;
+
+    @Column(name = "fair_value_updated_at")
+    private Instant fairValueUpdatedAt;
+
+    @Column(name = "settlement_value_cents")
+    private Long settlementValueCents;
+
+    @Column(name = "settlement_fantasy_points")
+    private BigDecimal settlementFantasyPoints;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -114,6 +136,37 @@ public class AthleteMarketEntity {
 
     public void setLastTradePriceCents(Long lastTradePriceCents) {
         this.lastTradePriceCents = lastTradePriceCents;
+    }
+
+    public Long getFairValueCents() {
+        return fairValueCents;
+    }
+
+    public String getFairValueAsOfEventId() {
+        return fairValueAsOfEventId;
+    }
+
+    public Instant getFairValueUpdatedAt() {
+        return fairValueUpdatedAt;
+    }
+
+    public void updateFairValue(long fairValueCents, String asOfEventId, Instant at) {
+        this.fairValueCents = fairValueCents;
+        this.fairValueAsOfEventId = asOfEventId;
+        this.fairValueUpdatedAt = at;
+    }
+
+    public Long getSettlementValueCents() {
+        return settlementValueCents;
+    }
+
+    public BigDecimal getSettlementFantasyPoints() {
+        return settlementFantasyPoints;
+    }
+
+    public void setSettlement(long valueCents, BigDecimal fantasyPoints) {
+        this.settlementValueCents = valueCents;
+        this.settlementFantasyPoints = fantasyPoints;
     }
 
     public Instant getCreatedAt() {

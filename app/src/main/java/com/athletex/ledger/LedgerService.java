@@ -54,7 +54,7 @@ public class LedgerService {
                     .orElseThrow(() -> new IllegalArgumentException("unknown account " + accountId));
             long delta = deltaByAccount.get(accountId);
             long newBalance = account.getBalanceCents() + delta;
-            if (newBalance < 0 && account.getType().mustStayNonNegative()) {
+            if (newBalance < 0 && account.getType().mustStayNonNegative() && !type.permitsOverdraft()) {
                 throw new InsufficientFundsException(accountId, delta, account.getBalanceCents());
             }
             account.setBalanceCents(newBalance);

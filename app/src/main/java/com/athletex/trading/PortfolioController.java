@@ -22,7 +22,7 @@ public class PortfolioController {
     }
 
     public record PortfolioView(long cashCents, long escrowCents, long positionsValueCents,
-                                long totalEquityCents, List<PositionView> positions) {
+                                long totalEquityCents, long totalRealizedPnlCents, List<PositionView> positions) {
     }
 
     private final PositionRepository positionRepository;
@@ -52,7 +52,9 @@ public class PortfolioController {
         long cash = balance(userId, AccountType.USER_CASH);
         long escrow = balance(userId, AccountType.USER_ESCROW);
         long positionsValue = positions.stream().mapToLong(PositionView::marketValueCents).sum();
-        return new PortfolioView(cash, escrow, positionsValue, cash + escrow + positionsValue, positions);
+        long realized = positionRepository.findByUserId(userId).stream()
+                .mapToLong(PositionEntity::getRealizedPnlCents).sum();
+        return new PortfolioView(cash, escrow, positionsValue, cash + escrow + positionsValue, realized, positions);
     }
 
     private long balance(UUID userId, AccountType type) {

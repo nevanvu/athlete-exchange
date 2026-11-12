@@ -24,7 +24,8 @@ public class SlateController {
     public record MarketView(UUID id, UUID athleteId, String athleteName, String position, String teamCode,
                              UUID gameId, MarketStatus status, BigDecimal projectedFantasyPoints,
                              long reservePriceCents, int totalShares,
-                             Long ipoClearingPriceCents, Long lastTradePriceCents) {
+                             Long ipoClearingPriceCents, Long lastTradePriceCents,
+                             Long fairValueCents, Long settlementValueCents) {
     }
 
     public record SlateDetail(UUID id, String name, SlateStatus status, Instant ipoOpensAt, Instant ipoClosesAt,
@@ -80,7 +81,8 @@ public class SlateController {
                             team == null ? null : team.getCode(),
                             m.getGameId(), m.getStatus(), m.getProjectedFantasyPoints(),
                             Pricing.reservePriceCents(m.getProjectedFantasyPoints()), m.getTotalShares(),
-                            m.getIpoClearingPriceCents(), m.getLastTradePriceCents());
+                            m.getIpoClearingPriceCents(), m.getLastTradePriceCents(),
+                            m.getFairValueCents(), m.getSettlementValueCents());
                 })
                 .toList();
         return new SlateDetail(slate.getId(), slate.getName(), slate.getStatus(),

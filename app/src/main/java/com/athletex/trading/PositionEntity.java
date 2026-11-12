@@ -128,6 +128,26 @@ public class PositionEntity {
         touch();
     }
 
+    /**
+     * Pays out the whole holding at the settlement value: realized P&L absorbs the difference to
+     * cost basis and the shares cease to exist.
+     */
+    public void retireAtSettlement(long valueCents) {
+        if (lockedQuantity != 0) {
+            throw new IllegalStateException("cannot settle a position with %d shares still locked".formatted(lockedQuantity));
+        }
+        realizedPnlCents += quantity * valueCents - totalCostCents;
+        quantity = 0;
+        totalCostCents = 0;
+        touch();
+    }
+
+    /** Books a post-settlement correction against already-retired shares. */
+    public void adjustRealized(long deltaCents) {
+        realizedPnlCents += deltaCents;
+        touch();
+    }
+
     private void touch() {
         this.updatedAt = Instant.now();
     }

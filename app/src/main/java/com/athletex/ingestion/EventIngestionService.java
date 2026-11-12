@@ -3,16 +3,17 @@ package com.athletex.ingestion;
 import com.athletex.events.EventCodec;
 import com.athletex.events.EventEnvelope;
 import com.athletex.events.EventPayload;
-import com.athletex.events.NbaFantasyScoring;
 import com.athletex.market.GameEntity;
 import com.athletex.market.GameRepository;
 import com.athletex.market.GameStatus;
 import com.athletex.market.SlateLifecycleService;
+import com.athletex.scoring.ScoringRules;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
@@ -37,6 +38,8 @@ public class EventIngestionService {
     private final AthleteAvailabilityRepository availabilityRepository;
     private final NewsEventRepository newsRepository;
     private final SlateLifecycleService lifecycle;
+    private final ScoringRules scoringRules;
+    private final ApplicationEventPublisher publisher;
     private final EventCodec codec = new EventCodec();
     private final JsonMapper json = JsonMapper.builder().build();
 
@@ -45,13 +48,17 @@ public class EventIngestionService {
                                  AthleteGameStatsRepository statsRepository,
                                  AthleteAvailabilityRepository availabilityRepository,
                                  NewsEventRepository newsRepository,
-                                 SlateLifecycleService lifecycle) {
+                                 SlateLifecycleService lifecycle,
+                                 ScoringRules scoringRules,
+                                 ApplicationEventPublisher publisher) {
         this.eventRepository = eventRepository;
         this.gameRepository = gameRepository;
         this.statsRepository = statsRepository;
         this.availabilityRepository = availabilityRepository;
         this.newsRepository = newsRepository;
         this.lifecycle = lifecycle;
+        this.scoringRules = scoringRules;
+        this.publisher = publisher;
     }
 
     @Transactional
@@ -83,6 +90,7 @@ public class EventIngestionService {
         }
         game.updateClock(status.period(), status.clockSecondsRemaining(), event.sequence());
         lifecycle.recordGameStatus(game.getId(), GameStatus.valueOf(status.status().name()), "event:" + event.eventId());
+        publisher.publishEvent(new GameDataChanged.GameClock(game.getId(), event.eventId(), event.occurredAt()));
         return Outcome.APPLIED;
     }
 
@@ -95,8 +103,10 @@ public class EventIngestionService {
         }
         stats.replace(json.writeValueAsString(line.stats()),
                 BigDecimal.valueOf(line.minutesPlayed()).setScale(1, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(NbaFantasyScoring.fantasyPoints(line.stats())).setScale(2, RoundingMode.HALF_UP),
+                scoringRules.fantasyPointsDecimal(line.stats()),
                 line.isFinal(), event.sequence(), event.eventId());
+        publisher.publishEvent(new GameDataChanged.AthleteStats(gameId, key.getAthleteId(), event.eventId(),
+                event.occurredAt(), line.isFinal()));
         return Outcome.APPLIED;
     }
 
@@ -108,6 +118,8 @@ public class EventIngestionService {
             return Outcome.STALE;
         }
         availability.replace(injury.status(), injury.detail(), event.sequence(), event.eventId());
+        publisher.publishEvent(new GameDataChanged.AthleteAvailability(gameId, key.getAthleteId(), event.eventId(),
+                event.occurredAt()));
         return Outcome.APPLIED;
     }
 
@@ -115,6 +127,8 @@ public class EventIngestionService {
         newsRepository.save(new NewsEventEntity(event.eventId(), gameId, UUID.fromString(news.athleteId()),
                 news.headline(), BigDecimal.valueOf(news.impact()), BigDecimal.valueOf(news.confidence()),
                 event.occurredAt()));
+        publisher.publishEvent(new GameDataChanged.AthleteNews(gameId, UUID.fromString(news.athleteId()),
+                event.eventId(), event.occurredAt()));
         return Outcome.APPLIED;
     }
 }

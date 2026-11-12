@@ -60,8 +60,10 @@ Bounded so stale or spammy news can't dominate the fundamental anchor. Expired t
 ## Update cadence and publication
 
 - Recompute FV for an athlete whenever a `stat_line`, `injury_event`, `news_event`, or game-clock event arrives for them — target: event received → FV published in under 2 seconds.
-- Also recompute on a 60s timer during live play so FV drifts with the clock even between events.
-- Publish as a `fair_value_updated` message (athlete_id, slate_id, fv, components breakdown, as_of_event_id) to the price-update topic; the WebSocket layer fans it out, Redis caches the latest per athlete.
+- Also recompute on a 60s timer during live play so news sentiment decays between events. (Game-clock movement already arrives as `game_status` events.)
+- Persist the latest FV on the market row and every change as a `fair_value_ticks` row (with the model inputs), and publish a `fair_value_updated` message (athlete_id, slate_id, fv, previous fv, components breakdown, as_of_event_id) to `market-events` through the transactional outbox. The WebSocket layer (M8) fans it out; a Redis cache for hot reads can sit in front of the market row then.
+- News decay is evaluated at the triggering event's own timestamp during ingestion (wall-clock time only on the timer), so replaying a recorded game reproduces the same FV sequence.
+- Expected points go through the same rounding as settlement (`Pricing.settlementValueCents`), so a finished game's FV equals exactly what settlement pays.
 - `as_of_event_id` makes updates traceable and lets the replay harness assert FV determinism: same event stream in, same FV sequence out.
 
 ## Halt rule
