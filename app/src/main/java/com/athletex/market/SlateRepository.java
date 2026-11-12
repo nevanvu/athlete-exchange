@@ -21,4 +21,6 @@ public interface SlateRepository extends JpaRepository<SlateEntity, UUID> {
     List<SlateEntity> findByStatusAndIpoClosesAtLessThanEqual(SlateStatus status, Instant now);
 
     List<SlateEntity> findAllByOrderByCreatedAtDesc();
+
+    List<SlateEntity> findByStatus(SlateStatus status);
 }

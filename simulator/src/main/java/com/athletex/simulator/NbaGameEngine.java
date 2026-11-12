@@ -110,8 +110,13 @@ public final class NbaGameEngine {
         int clock = PERIOD_SECONDS - ((elapsedSeconds - 1) % PERIOD_SECONDS + 1);
 
         if (elapsedSeconds >= GAME_SECONDS) {
+            // Box score first, then the final whistle: settlement can rely on the lines being in.
+            for (AthleteState a : athletes.values()) {
+                out.add(emit(new EventPayload.StatLine(a.spec.athleteId(), Map.copyOf(a.stats), a.minutesPlayed, true)));
+            }
             out.add(emit(new EventPayload.GameStatus(GameState.FINAL, PERIODS, 0)));
             finished = true;
+            return out;
         } else if (elapsedSeconds == 2 * PERIOD_SECONDS) {
             out.add(emit(new EventPayload.GameStatus(GameState.HALFTIME, 2, 0)));
         } else {
@@ -121,9 +126,7 @@ public final class NbaGameEngine {
         maybeRandomInjury(out);
 
         for (AthleteState a : athletes.values()) {
-            if (finished) {
-                out.add(emit(new EventPayload.StatLine(a.spec.athleteId(), Map.copyOf(a.stats), a.minutesPlayed, true)));
-            } else if (a.active && random.nextDouble() < a.onCourtProbability) {
+            if (a.active && random.nextDouble() < a.onCourtProbability) {
                 a.minutesPlayed += TICK_SECONDS / 60.0;
                 if (play(a)) {
                     out.add(emit(new EventPayload.StatLine(a.spec.athleteId(), Map.copyOf(a.stats), a.minutesPlayed, false)));

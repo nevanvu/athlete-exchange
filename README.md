@@ -118,3 +118,11 @@ curl -s localhost:8081/simulations/<game-uuid>/injury -H 'Content-Type: applicat
 ```
 
 Set `athletex.simulator.record-dir` to also write each game's events as NDJSON for replay.
+
+### Fair value and settlement
+
+Every applied game event reprices the affected markets' reference **fair value**: points already scored, plus the projection scaled by the share of the game left and the athlete's injury status, times a decaying news factor. Fair value appears next to the market price in `GET /api/slates/{id}` and `GET /api/markets/{id}/book`, and its history (with model inputs) is at `GET /api/markets/{id}/fair-value`.
+
+A few seconds after a slate closes, the settlement job pays every holder `clamp(fantasy points x $0.25, $1, $100)` per share from the settlement pool in one ledger transaction, retires the shares and marks the slate `SETTLED`. A stat revision within 48 hours pays or claws back the difference against the holdings at settlement. Results and corrections: `GET /api/slates/{id}/settlement`.
+
+`./gradlew :simulator:recordGame --args="<file> <seed>"` writes a sample game to NDJSON; `app/src/test/resources/replays/sample-game.ndjson` is replayed by the test suite.

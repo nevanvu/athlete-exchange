@@ -14,3 +14,11 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
+
+tasks.register<JavaExec>("recordGame") {
+    group = "application"
+    description = "Writes the sample simulated game as NDJSON: --args=\"<out-file> <seed>\""
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.athletex.simulator.RecordGame")
+    workingDir = rootProject.projectDir
+}

@@ -42,7 +42,7 @@ public class TradingController {
     }
 
     public record BookView(UUID marketId, Long lastTradePriceCents, Long ipoClearingPriceCents,
-                           List<BookSnapshot.Level> bids, List<BookSnapshot.Level> asks) {
+                           Long fairValueCents, List<BookSnapshot.Level> bids, List<BookSnapshot.Level> asks) {
     }
 
     private final OrderService orderService;
@@ -87,7 +87,7 @@ public class TradingController {
                 .orElseThrow(() -> new IllegalArgumentException("unknown market " + id));
         BookSnapshot snapshot = registry.withMarketLock(id, () -> registry.book(id).snapshot());
         return new BookView(id, market.getLastTradePriceCents(), market.getIpoClearingPriceCents(),
-                snapshot.bids(), snapshot.asks());
+                market.getFairValueCents(), snapshot.bids(), snapshot.asks());
     }
 
     @GetMapping("/markets/{id}/trades")
