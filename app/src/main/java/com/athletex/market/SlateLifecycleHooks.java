@@ -8,6 +8,10 @@ import java.util.UUID;
  */
 public interface SlateLifecycleHooks {
 
+    /** Runs inside every applied transition's transaction, after the status flips. */
+    default void onTransition(UUID slateId, SlateStatus from, SlateStatus to, String trigger) {
+    }
+
     /** Runs inside the IPO -> OPEN_MARKET transaction, before the status flips. */
     default void onIpoClosing(UUID slateId) {
     }

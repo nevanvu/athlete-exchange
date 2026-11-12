@@ -32,6 +32,16 @@ public class GameEntity {
     @Column(name = "starts_at", nullable = false)
     private Instant startsAt;
 
+    @Column(nullable = false)
+    private int period;
+
+    @Column(name = "clock_seconds_remaining", nullable = false)
+    private int clockSecondsRemaining;
+
+    /** Sequence of the game_status event that last set status/clock; older ones are ignored. */
+    @Column(name = "status_sequence", nullable = false)
+    private long statusSequence;
+
     protected GameEntity() {
     }
 
@@ -70,5 +80,23 @@ public class GameEntity {
 
     public Instant getStartsAt() {
         return startsAt;
+    }
+
+    public int getPeriod() {
+        return period;
+    }
+
+    public int getClockSecondsRemaining() {
+        return clockSecondsRemaining;
+    }
+
+    public long getStatusSequence() {
+        return statusSequence;
+    }
+
+    public void updateClock(int period, int clockSecondsRemaining, long statusSequence) {
+        this.period = period;
+        this.clockSecondsRemaining = clockSecondsRemaining;
+        this.statusSequence = statusSequence;
     }
 }
