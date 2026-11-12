@@ -169,10 +169,14 @@ public class SlateLifecycleService {
     }
 
     private void setMarketStatus(UUID marketId, MarketStatus status, String reason) {
-        AthleteMarketEntity market = marketRepository.findById(marketId)
+        AthleteMarketEntity market = marketRepository.findByIdForUpdate(marketId)
                 .orElseThrow(() -> new IllegalArgumentException("unknown market " + marketId));
         if (market.getStatus() != status) {
-            market.setStatus(status);
+            if (status == MarketStatus.HALTED) {
+                market.halt("manual: " + reason, Instant.now(), null);
+            } else {
+                market.resume();
+            }
             log.info("market {} -> {} ({})", marketId, status, reason);
         }
     }

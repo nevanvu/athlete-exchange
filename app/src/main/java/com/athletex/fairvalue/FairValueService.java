@@ -1,6 +1,7 @@
 package com.athletex.fairvalue;
 
 import com.athletex.events.EventPayload.InjuryStatus;
+import com.athletex.halts.HaltService;
 import com.athletex.ingestion.AthleteAvailabilityEntity;
 import com.athletex.ingestion.AthleteAvailabilityRepository;
 import com.athletex.ingestion.AthleteGameStatsEntity;
@@ -46,6 +47,11 @@ public class FairValueService implements SlateLifecycleHooks {
 
     private static final int NEWS_LOOKBACK_TAUS = 8;
 
+    /** Whether a repricing may halt the market, and on what grounds. */
+    private enum HaltCheck {
+        NONE, PRICE_MOVE, INJURY_OUT
+    }
+
     private final AthleteMarketRepository marketRepository;
     private final SlateRepository slateRepository;
     private final GameRepository gameRepository;
@@ -54,6 +60,7 @@ public class FairValueService implements SlateLifecycleHooks {
     private final NewsEventRepository newsRepository;
     private final FairValueTickRepository tickRepository;
     private final OutboxService outbox;
+    private final HaltService haltService;
     private final String topic;
 
     public FairValueService(AthleteMarketRepository marketRepository,
@@ -64,6 +71,7 @@ public class FairValueService implements SlateLifecycleHooks {
                             NewsEventRepository newsRepository,
                             FairValueTickRepository tickRepository,
                             OutboxService outbox,
+                            HaltService haltService,
                             @Value("${athletex.kafka.market-events-topic:market-events}") String topic) {
         this.marketRepository = marketRepository;
         this.slateRepository = slateRepository;
@@ -73,19 +81,24 @@ public class FairValueService implements SlateLifecycleHooks {
         this.newsRepository = newsRepository;
         this.tickRepository = tickRepository;
         this.outbox = outbox;
+        this.haltService = haltService;
         this.topic = topic;
     }
 
     @EventListener
     public void onGameDataChanged(GameDataChanged change) {
+        // Row locks (id order) serialize this repricing, and any halt it causes, with order placement.
         List<AthleteMarketEntity> affected = switch (change) {
-            case GameDataChanged.GameClock clock -> marketRepository.findByGameId(clock.gameId());
-            case GameDataChanged.AthleteStats s -> marketFor(s.gameId(), s.athleteId());
-            case GameDataChanged.AthleteAvailability a -> marketFor(a.gameId(), a.athleteId());
-            case GameDataChanged.AthleteNews n -> marketFor(n.gameId(), n.athleteId());
+            case GameDataChanged.GameClock clock -> marketRepository.findByGameIdForUpdate(clock.gameId());
+            case GameDataChanged.AthleteStats s -> lockedMarketFor(s.gameId(), s.athleteId());
+            case GameDataChanged.AthleteAvailability a -> lockedMarketFor(a.gameId(), a.athleteId());
+            case GameDataChanged.AthleteNews n -> lockedMarketFor(n.gameId(), n.athleteId());
         };
+        HaltCheck haltCheck = change instanceof GameDataChanged.AthleteAvailability a && ruledOut(a)
+                ? HaltCheck.INJURY_OUT
+                : HaltCheck.PRICE_MOVE;
         for (AthleteMarketEntity market : affected) {
-            recompute(market, change.occurredAt(), change.eventId());
+            recompute(market, change.occurredAt(), change.eventId(), haltCheck);
         }
     }
 
@@ -116,14 +129,32 @@ public class FairValueService implements SlateLifecycleHooks {
         persist(market, result, asOfEventId, Instant.now());
     }
 
+    /** Reprices without halting (timer refresh, IPO open, explicit recomputation). */
     @Transactional
     public FairValueModel.Result recompute(AthleteMarketEntity market, Instant at, String asOfEventId) {
+        return recompute(market, at, asOfEventId, HaltCheck.NONE);
+    }
+
+    private FairValueModel.Result recompute(AthleteMarketEntity market, Instant at, String asOfEventId,
+                                            HaltCheck haltCheck) {
         SlateStatus slateStatus = slateRepository.findById(market.getSlateId()).orElseThrow().getStatus();
         if (slateStatus.isTerminal()) {
             return null; // settled markets are pinned to their settlement value
         }
         FairValueModel.Result result = FairValueModel.compute(inputs(market, at));
-        if (market.getFairValueCents() == null || market.getFairValueCents() != result.fairValueCents()) {
+        Long previous = market.getFairValueCents();
+        boolean changed = previous == null || previous != result.fairValueCents();
+
+        // Halt first, so the halt is committed and published ahead of the price that caused it.
+        if (haltCheck == HaltCheck.INJURY_OUT) {
+            haltService.halt(market, "injury: athlete ruled OUT", asOfEventId, previous, result.fairValueCents());
+        } else if (haltCheck == HaltCheck.PRICE_MOVE && changed
+                && haltService.isHaltWorthyMove(previous, result.fairValueCents())) {
+            long percent = Math.round(100.0 * Math.abs(result.fairValueCents() - previous) / previous);
+            haltService.halt(market, "fair value moved " + percent + "% on one event", asOfEventId, previous,
+                    result.fairValueCents());
+        }
+        if (changed) {
             persist(market, result, asOfEventId, at);
         }
         return result;
@@ -158,7 +189,13 @@ public class FairValueService implements SlateLifecycleHooks {
                 asOfEventId, at));
     }
 
-    private List<AthleteMarketEntity> marketFor(UUID gameId, UUID athleteId) {
-        return marketRepository.findByGameIdAndAthleteId(gameId, athleteId).stream().toList();
+    private List<AthleteMarketEntity> lockedMarketFor(UUID gameId, UUID athleteId) {
+        return marketRepository.findByGameIdAndAthleteIdForUpdate(gameId, athleteId).stream().toList();
+    }
+
+    private boolean ruledOut(GameDataChanged.AthleteAvailability change) {
+        return availabilityRepository.findById(new GameAthleteKey(change.gameId(), change.athleteId()))
+                .map(a -> a.getStatus() == InjuryStatus.OUT)
+                .orElse(false);
     }
 }

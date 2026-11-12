@@ -2,6 +2,7 @@ package com.athletex.trading;
 
 import com.athletex.market.AthleteMarketEntity;
 import com.athletex.market.AthleteMarketRepository;
+import com.athletex.market.MarketStatus;
 import com.athletex.matching.BookSnapshot;
 import com.athletex.matching.OrderType;
 import com.athletex.matching.Side;
@@ -41,8 +42,9 @@ public class TradingController {
     public record PlacedOrderView(OrderView order, List<TradeView> trades) {
     }
 
-    public record BookView(UUID marketId, Long lastTradePriceCents, Long ipoClearingPriceCents,
-                           Long fairValueCents, List<BookSnapshot.Level> bids, List<BookSnapshot.Level> asks) {
+    public record BookView(UUID marketId, MarketStatus status, String haltReason, Instant resumeAfter,
+                           Long lastTradePriceCents, Long ipoClearingPriceCents, Long fairValueCents,
+                           List<BookSnapshot.Level> bids, List<BookSnapshot.Level> asks) {
     }
 
     private final OrderService orderService;
@@ -86,8 +88,9 @@ public class TradingController {
         AthleteMarketEntity market = marketRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("unknown market " + id));
         BookSnapshot snapshot = registry.withMarketLock(id, () -> registry.book(id).snapshot());
-        return new BookView(id, market.getLastTradePriceCents(), market.getIpoClearingPriceCents(),
-                market.getFairValueCents(), snapshot.bids(), snapshot.asks());
+        return new BookView(id, market.getStatus(), market.getHaltReason(), market.getResumeAfter(),
+                market.getLastTradePriceCents(), market.getIpoClearingPriceCents(), market.getFairValueCents(),
+                snapshot.bids(), snapshot.asks());
     }
 
     @GetMapping("/markets/{id}/trades")

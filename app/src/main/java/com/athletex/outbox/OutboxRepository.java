@@ -6,9 +6,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface OutboxRepository extends JpaRepository<OutboxEntity, UUID> {
 
-    List<OutboxEntity> findTop100ByPublishedAtIsNullOrderByCreatedAtAsc();
+    List<OutboxEntity> findTop100ByPublishedAtIsNullOrderBySeqAsc();
 
     long countByPublishedAtIsNull();
 
-    List<OutboxEntity> findByMessageKeyOrderByCreatedAtAsc(String messageKey);
+    List<OutboxEntity> findByMessageKeyOrderBySeqAsc(String messageKey);
 }

@@ -67,6 +67,16 @@ public class AthleteMarketEntity {
     @Column(name = "settlement_fantasy_points")
     private BigDecimal settlementFantasyPoints;
 
+    @Column(name = "halt_reason")
+    private String haltReason;
+
+    @Column(name = "halted_at")
+    private Instant haltedAt;
+
+    /** When an automatic halt may lift; null for manual halts, which only lift manually. */
+    @Column(name = "resume_after")
+    private Instant resumeAfter;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -106,9 +116,6 @@ public class AthleteMarketEntity {
         return status;
     }
 
-    void setStatus(MarketStatus status) {
-        this.status = status;
-    }
 
     public BigDecimal getProjectedFantasyPoints() {
         return projectedFantasyPoints;
@@ -167,6 +174,34 @@ public class AthleteMarketEntity {
     public void setSettlement(long valueCents, BigDecimal fantasyPoints) {
         this.settlementValueCents = valueCents;
         this.settlementFantasyPoints = fantasyPoints;
+    }
+
+    public String getHaltReason() {
+        return haltReason;
+    }
+
+    public Instant getHaltedAt() {
+        return haltedAt;
+    }
+
+    public Instant getResumeAfter() {
+        return resumeAfter;
+    }
+
+    public void halt(String reason, Instant at, Instant resumeAfter) {
+        if (this.status != MarketStatus.HALTED) {
+            this.haltedAt = at;
+        }
+        this.status = MarketStatus.HALTED;
+        this.haltReason = reason;
+        this.resumeAfter = resumeAfter;
+    }
+
+    public void resume() {
+        this.status = MarketStatus.ACTIVE;
+        this.haltReason = null;
+        this.haltedAt = null;
+        this.resumeAfter = null;
     }
 
     public Instant getCreatedAt() {

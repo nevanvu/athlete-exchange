@@ -15,7 +15,8 @@ Sports stock markets whose prices depended only on demand (Football Index) colla
 - **Open market** — limit/market orders matched by a price-time-priority engine, one book per athlete.
 - **Fair value** — a model-based reference price updated live from game events, shown beside the market price. News and rumors nudge it with decay but never change settlement. See [docs/fair-value-model.md](docs/fair-value-model.md).
 - **Settlement** — atomic, idempotent end-of-slate payout through a double-entry ledger, with a 48-hour correction window for revised stats.
-- **Trading halts** — a market halts before any single-event fair-value move over 15% is published, so nobody trades against stale prices when an injury breaks.
+- **Trading halts** — a market halts before any single-event fair-value move over 15% (and at least $1) or an OUT ruling is published, so nobody trades against stale prices when an injury breaks.
+- **Market maker** — the house quotes both sides around fair value from its own inventory, widening with volatility and going quiet during halts.
 
 ## Architecture
 
