@@ -63,19 +63,21 @@ class SettlementTest extends AbstractLiveSlateTest {
         long alicePaid = 500 * 1215 + 100 * 100;
         long bobPaid = 400 * 1215 + 300 * 525;
         long carolPaid = 100 * 1215;
+        long housePaid = 700 * 525 + 900 * 100; // unsold IPO inventory in ROLE and DNP
+        long totalPaid = alicePaid + bobPaid + carolPaid + housePaid;
         assertThat(cash(alice)).isEqualTo(SEED_CENTS - 660_000 - 30_000 + 130_000 + alicePaid);
         assertThat(cash(bob)).isEqualTo(SEED_CENTS - 440_000 - 150_000 + bobPaid);
         assertThat(cash(carol)).isEqualTo(SEED_CENTS - 130_000 + carolPaid);
-        assertThat(poolBefore - poolBalance()).isEqualTo(alicePaid + bobPaid + carolPaid);
+        assertThat(poolBefore - poolBalance()).isEqualTo(totalPaid);
 
         SettlementRunEntity run = runRepository.findBySlateId(s.slateId).orElseThrow();
-        assertThat(run.getTotalPaidCents()).isEqualTo(alicePaid + bobPaid + carolPaid);
+        assertThat(run.getTotalPaidCents()).isEqualTo(totalPaid);
         assertThat(run.getLedgerTransactionId()).isNotNull();
         Map<UUID, Long> paidByUser = payoutRepository.findByRunId(run.getId()).stream()
                 .collect(Collectors.groupingBy(SettlementPayoutEntity::getUserId,
                         Collectors.summingLong(SettlementPayoutEntity::getAmountCents)));
         assertThat(paidByUser).containsOnly(Map.entry(alice, alicePaid), Map.entry(bob, bobPaid),
-                Map.entry(carol, carolPaid));
+                Map.entry(carol, carolPaid), Map.entry(PositionEntity.HOUSE_USER_ID, housePaid));
 
         // Every share in the slate is retired, house inventory included.
         for (UUID market : s.markets) {
@@ -90,7 +92,7 @@ class SettlementTest extends AbstractLiveSlateTest {
         // Idempotent: a second run (redelivered trigger, restart) pays nothing more.
         assertThat(settlementService.settle(s.slateId).outcome()).isEqualTo(SettlementService.Outcome.ALREADY_SETTLED);
         assertThat(cash(alice)).isEqualTo(SEED_CENTS - 660_000 - 30_000 + 130_000 + alicePaid);
-        assertThat(poolBefore - poolBalance()).isEqualTo(alicePaid + bobPaid + carolPaid);
+        assertThat(poolBefore - poolBalance()).isEqualTo(totalPaid);
     }
 
     @Test

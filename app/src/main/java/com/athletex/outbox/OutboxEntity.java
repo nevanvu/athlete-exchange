@@ -29,6 +29,10 @@ public class OutboxEntity {
     @Column(name = "published_at")
     private Instant publishedAt;
 
+    /** Assigned by the database on insert; defines relay order. */
+    @Column(insertable = false, updatable = false)
+    private Long seq;
+
     protected OutboxEntity() {
     }
 
@@ -58,6 +62,10 @@ public class OutboxEntity {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Long getSeq() {
+        return seq;
     }
 
     public Instant getPublishedAt() {

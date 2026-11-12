@@ -31,7 +31,7 @@ Halts are **per athlete market**, not a slate state. A market in an `OPEN_MARKET
 | `IPO → OPEN_MARKET` | Scheduler, at `ipo_closes_at` | IPO clearing prices computed; allocations and refunds posted to ledger |
 | `OPEN_MARKET → CLOSED` | Last `game_end` event in the slate | Every game in slate has status `FINAL` |
 | `CLOSED → SETTLED` | Settlement job | Official (non-provisional) stats for all athletes; settlement run committed atomically |
-| `ACTIVE → HALTED` (market) | `injury_event` severity ≥ `OUT`, or manual flag | — |
+| `ACTIVE → HALTED` (market) | `injury_event` severity ≥ `OUT`, a single-event FV move > 15% and ≥ $1.00, or manual flag | Slate is `OPEN_MARKET` |
 | `HALTED → ACTIVE` (market) | Fair value recomputed and published after the triggering event | Minimum halt duration elapsed (e.g. 30s) |
 | `any non-terminal → VOIDED` | Manual admin action, or watchdog (no stats N hours after close) | — |
 

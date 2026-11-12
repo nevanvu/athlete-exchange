@@ -68,14 +68,23 @@ Bounded so stale or spammy news can't dominate the fundamental anchor. Expired t
 
 ## Halt rule
 
-If a single event moves FV by more than **15%**, halt the market before publishing the new FV, publish, hold the halt for a minimum of 30 seconds, then reopen. This is the stale-quote protection: nobody trades against a pre-injury price in the gap before the reprice lands.
+If a single event moves FV by more than **15% and by at least $1.00**, or rules the athlete **OUT**, halt the market before publishing the new FV, publish, hold the halt for a minimum of 30 seconds, then reopen. This is the stale-quote protection: nobody trades against a pre-injury price in the gap before the reprice lands.
+
+- The $1.00 minimum keeps cheap athletes tradable: a $3.00 bench player would otherwise halt on every three-pointer (+$0.75 is a 25% move).
+- Halts apply only while the slate is `OPEN_MARKET`; pre-game news reprices the IPO without halting it.
+- The halt is written in the same transaction as the repricing, and the outbox relays in insertion order, so `market_halted` always reaches consumers before the `fair_value_updated` that caused it.
+- Order placement and repricing both take the market's row lock, so an order racing a halt either fills strictly before it or is rejected; it can never fill against the stale price after the halt is committed.
+- A second shock during a halt extends it. Manual halts never lift automatically. Halt history: `GET /api/markets/{id}/halts`.
 
 ## Market-maker bot (liquidity)
 
 The house bot quotes around FV in thin markets:
 
-- Bid at `FV × (1 − spread)`, ask at `FV × (1 + spread)`, spread 2–5% widening with recent FV volatility.
-- Inventory-limited (max long/short per athlete from the house account) and always re-quotes after an FV update, never during a halt.
+- Bid at `FV × (1 − spread)`, ask at `FV × (1 + spread)`, spread `min(5%, 2% + 2 × volatility)`, where volatility is the root-mean-square of the last 10 relative FV changes.
+- Trades the house account's own inventory (unsold IPO shares) and cash ($250,000 seeded from the house ledger account) through the normal order path, 50 shares a side.
+- Inventory-limited: no bid once holdings would exceed the cap (2,000 shares), no ask without shares (no shorting).
+- Re-quotes every 2 seconds when its desired quote changed; pulls its quotes while a market is halted, and the halt resumer pulls them again before reopening so nothing priced before the halt is left on the book.
+- The house is paid at settlement like any other holder.
 
 ## What's deliberately out (v1)
 

@@ -67,7 +67,7 @@ class FairValueServiceTest extends AbstractLiveSlateTest {
         EventEnvelope injury = s.apply(s.injury(0, InjuryStatus.OUT));
 
         assertThat(s.market(0).getFairValueCents()).isEqualTo(12 * 25);
-        OutboxEntity published = outboxRepository.findByMessageKeyOrderByCreatedAtAsc(s.markets.get(0).toString())
+        OutboxEntity published = outboxRepository.findByMessageKeyOrderBySeqAsc(s.markets.get(0).toString())
                 .getLast();
         assertThat(published.getPayload())
                 .contains("\"type\":\"fair_value_updated\"")

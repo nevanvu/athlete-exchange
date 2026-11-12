@@ -28,7 +28,7 @@ public class OutboxRelay {
     @Scheduled(fixedDelayString = "${athletex.outbox.relay.delay-ms:1000}")
     @Transactional
     public int relay() {
-        List<OutboxEntity> pending = repository.findTop100ByPublishedAtIsNullOrderByCreatedAtAsc();
+        List<OutboxEntity> pending = repository.findTop100ByPublishedAtIsNullOrderBySeqAsc();
         int published = 0;
         for (OutboxEntity row : pending) {
             try {

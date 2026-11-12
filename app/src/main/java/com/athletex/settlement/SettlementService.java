@@ -117,15 +117,14 @@ public class SettlementService {
                 if (position.getQuantity() == 0) {
                     continue;
                 }
-                if (!position.getUserId().equals(PositionEntity.HOUSE_USER_ID)) {
-                    SettlementPayoutEntity payout = new SettlementPayoutEntity(runId, market.getId(),
-                            position.getUserId(), position.getQuantity(), value);
-                    payouts.add(payout);
-                    creditsByCashAccount.merge(ledgerService.accountIdOf(position.getUserId(), AccountType.USER_CASH),
-                            payout.getAmountCents(), Long::sum);
-                    totalPaid += payout.getAmountCents();
-                }
-                // House inventory is retired too; paying the house from the house's own pool would be a no-op.
+                // Every holder is paid the same way, the house (market maker) included: its inventory
+                // changes through trading, so skipping it would destroy the value of shares it bought.
+                SettlementPayoutEntity payout = new SettlementPayoutEntity(runId, market.getId(),
+                        position.getUserId(), position.getQuantity(), value);
+                payouts.add(payout);
+                creditsByCashAccount.merge(ledgerService.accountIdOf(position.getUserId(), AccountType.USER_CASH),
+                        payout.getAmountCents(), Long::sum);
+                totalPaid += payout.getAmountCents();
                 position.retireAtSettlement(value);
             }
             fairValueService.recordSettlementValue(market, value, fantasyPoints, null);

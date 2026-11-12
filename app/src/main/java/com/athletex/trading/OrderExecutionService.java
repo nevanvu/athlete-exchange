@@ -64,7 +64,8 @@ public class OrderExecutionService {
         if (type == OrderType.LIMIT && (priceCents == null || priceCents <= 0)) {
             throw new IllegalArgumentException("limit orders need a positive price");
         }
-        AthleteMarketEntity market = marketRepository.findById(marketId)
+        // Row lock: a halt committed by event ingestion is either fully visible here or waits for this order.
+        AthleteMarketEntity market = marketRepository.findByIdForUpdate(marketId)
                 .orElseThrow(() -> new IllegalArgumentException("unknown market " + marketId));
         SlateEntity slate = slateRepository.findById(market.getSlateId()).orElseThrow();
         if (slate.getStatus() != SlateStatus.OPEN_MARKET) {

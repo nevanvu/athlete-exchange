@@ -64,13 +64,13 @@ class KafkaPipelineTest extends AbstractIngestionTest {
     @Test
     void slateTransitionsAreRelayedFromTheOutbox() {
         Fixture f = new Fixture(true);
-        List<OutboxEntity> rows = outboxRepository.findByMessageKeyOrderByCreatedAtAsc(f.slateId.toString());
+        List<OutboxEntity> rows = outboxRepository.findByMessageKeyOrderBySeqAsc(f.slateId.toString());
         assertThat(rows).hasSize(2);
         assertThat(rows.get(0).getPayload()).contains("\"to\":\"IPO\"");
         assertThat(rows.get(1).getPayload()).contains("\"to\":\"OPEN_MARKET\"");
 
         Await.until(TIMEOUT, "outbox rows to be published", () ->
-                outboxRepository.findByMessageKeyOrderByCreatedAtAsc(f.slateId.toString()).stream()
+                outboxRepository.findByMessageKeyOrderBySeqAsc(f.slateId.toString()).stream()
                         .allMatch(row -> row.getPublishedAt() != null));
     }
 }
