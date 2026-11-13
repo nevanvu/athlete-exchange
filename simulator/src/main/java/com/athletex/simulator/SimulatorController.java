@@ -35,8 +35,9 @@ public class SimulatorController {
                                Double speed, Long seed, Double injuriesPerGame) {
     }
 
+    /** {@code returningThisGame} is optional and defaults to false. */
     public record InjuryRequest(@NotBlank String athleteId, @NotNull EventPayload.InjuryStatus status,
-                                String detail, boolean returningThisGame) {
+                                String detail, Boolean returningThisGame) {
     }
 
     public record NewsRequest(@NotBlank String athleteId, @NotBlank String headline,
@@ -56,13 +57,14 @@ public class SimulatorController {
 
     @PostMapping
     public ResponseEntity<SessionView> start(@Valid @RequestBody StartRequest request) {
+        double speed = request.speed() == null ? 60.0 : request.speed();
         GameSpec spec = new GameSpec(request.gameId(), request.slateId(), Instant.now(),
                 request.seed() == null ? System.nanoTime() : request.seed(),
                 request.injuriesPerGame() == null ? 0.0 : request.injuriesPerGame(),
                 request.athletes().stream()
                         .map(a -> new GameSpec.AthleteSpec(a.athleteId(), a.projectedFantasyPoints(), a.projectedMinutes()))
-                        .toList());
-        GameSession session = simulations.start(spec, request.speed() == null ? 60.0 : request.speed());
+                        .toList(), speed);
+        GameSession session = simulations.start(spec, speed);
         return ResponseEntity.status(HttpStatus.CREATED).body(view(session));
     }
 
@@ -74,7 +76,7 @@ public class SimulatorController {
     @PostMapping("/{gameId}/injury")
     public SessionView injury(@PathVariable String gameId, @Valid @RequestBody InjuryRequest request) {
         return view(simulations.inject(gameId, new EventPayload.Injury(
-                request.athleteId(), request.status(), request.detail(), request.returningThisGame())));
+                request.athleteId(), request.status(), request.detail(), Boolean.TRUE.equals(request.returningThisGame()))));
     }
 
     @PostMapping("/{gameId}/news")

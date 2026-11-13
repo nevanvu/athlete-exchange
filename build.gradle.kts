@@ -19,5 +19,12 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+        // Full exception chains in the console, so CI logs show why a test failed, not just where.
+        testLogging {
+            events("failed")
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+            showCauses = true
+            showStackTraces = true
+        }
     }
 }

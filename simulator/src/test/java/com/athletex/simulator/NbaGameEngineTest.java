@@ -124,6 +124,14 @@ class NbaGameEngineTest {
     }
 
     @Test
+    void spedUpGamesStampEventsOnTheWallClock() {
+        GameSpec fast = new GameSpec("game-1", "slate-1", START, 1, 0, spec(1, 0).athletes(), 20.0);
+        List<EventEnvelope> events = new NbaGameEngine(fast).runToEnd();
+        // 48 game minutes at 20x is 2 minutes 24 seconds of real time.
+        assertThat(events.getLast().occurredAt()).isEqualTo(START.plusSeconds(144));
+    }
+
+    @Test
     void randomInjuriesHappenWhenConfigured() {
         long injuries = new NbaGameEngine(spec(9, 4.0)).runToEnd().stream()
                 .filter(e -> e.type() == EventType.INJURY_EVENT).count();
