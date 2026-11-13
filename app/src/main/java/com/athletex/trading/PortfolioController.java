@@ -3,7 +3,9 @@ package com.athletex.trading;
 import com.athletex.ledger.AccountEntity;
 import com.athletex.ledger.AccountRepository;
 import com.athletex.ledger.AccountType;
+import com.athletex.market.AthleteEntity;
 import com.athletex.market.AthleteMarketRepository;
+import com.athletex.market.AthleteRepository;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,7 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/portfolio")
 public class PortfolioController {
 
-    public record PositionView(UUID marketId, UUID athleteId, int quantity, int lockedQuantity,
+    public record PositionView(UUID marketId, UUID slateId, UUID athleteId, String athleteName, int quantity,
+                               int lockedQuantity,
                                long averageCostCents, Long lastPriceCents,
                                long marketValueCents, long unrealizedPnlCents, long realizedPnlCents) {
     }
@@ -28,12 +31,14 @@ public class PortfolioController {
     private final PositionRepository positionRepository;
     private final AthleteMarketRepository marketRepository;
     private final AccountRepository accountRepository;
+    private final AthleteRepository athleteRepository;
 
     public PortfolioController(PositionRepository positionRepository, AthleteMarketRepository marketRepository,
-                               AccountRepository accountRepository) {
+                               AccountRepository accountRepository, AthleteRepository athleteRepository) {
         this.positionRepository = positionRepository;
         this.marketRepository = marketRepository;
         this.accountRepository = accountRepository;
+        this.athleteRepository = athleteRepository;
     }
 
     @GetMapping
@@ -44,7 +49,10 @@ public class PortfolioController {
                     var market = marketRepository.findById(p.getMarketId()).orElseThrow();
                     Long last = market.getLastTradePriceCents();
                     long value = last == null ? p.getTotalCostCents() : last * p.getQuantity();
-                    return new PositionView(p.getMarketId(), market.getAthleteId(), p.getQuantity(),
+                    String athleteName = athleteRepository.findById(market.getAthleteId())
+                            .map(AthleteEntity::getName).orElse(null);
+                    return new PositionView(p.getMarketId(), market.getSlateId(), market.getAthleteId(), athleteName,
+                            p.getQuantity(),
                             p.getLockedQuantity(), p.averageCostCents(), last, value,
                             value - p.getTotalCostCents(), p.getRealizedPnlCents());
                 })

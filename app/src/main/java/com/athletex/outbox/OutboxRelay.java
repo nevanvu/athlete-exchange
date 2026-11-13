@@ -1,9 +1,12 @@
 package com.athletex.outbox;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -18,10 +21,20 @@ public class OutboxRelay {
 
     private final OutboxRepository repository;
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final Duration retention;
 
-    public OutboxRelay(OutboxRepository repository, KafkaTemplate<String, String> kafkaTemplate) {
+    public OutboxRelay(OutboxRepository repository, KafkaTemplate<String, String> kafkaTemplate,
+                       @Value("${athletex.outbox.retention:PT1H}") Duration retention) {
         this.repository = repository;
         this.kafkaTemplate = kafkaTemplate;
+        this.retention = retention;
+    }
+
+    /** Published rows are only kept for troubleshooting; the market maker alone writes several a second. */
+    @Scheduled(fixedDelayString = "${athletex.outbox.purge-ms:300000}")
+    @Transactional
+    public int purgePublished() {
+        return repository.deletePublishedBefore(Instant.now().minus(retention));
     }
 
     /** Publishes pending rows in order; a failure leaves the row unpublished for the next pass. */

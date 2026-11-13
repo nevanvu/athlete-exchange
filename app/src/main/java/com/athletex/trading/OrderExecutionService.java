@@ -39,6 +39,7 @@ public class OrderExecutionService {
     private final AthleteMarketRepository marketRepository;
     private final SlateRepository slateRepository;
     private final LedgerService ledgerService;
+    private final MarketDataPublisher marketData;
 
     public OrderExecutionService(MatchingEngineRegistry registry,
                                  OrderRepository orderRepository,
@@ -46,7 +47,8 @@ public class OrderExecutionService {
                                  PositionRepository positionRepository,
                                  AthleteMarketRepository marketRepository,
                                  SlateRepository slateRepository,
-                                 LedgerService ledgerService) {
+                                 LedgerService ledgerService,
+                                 MarketDataPublisher marketData) {
         this.registry = registry;
         this.orderRepository = orderRepository;
         this.tradeRepository = tradeRepository;
@@ -54,6 +56,7 @@ public class OrderExecutionService {
         this.marketRepository = marketRepository;
         this.slateRepository = slateRepository;
         this.ledgerService = ledgerService;
+        this.marketData = marketData;
     }
 
     @Transactional
@@ -105,6 +108,10 @@ public class OrderExecutionService {
             releaseRemainder(order);
             order.cancel();
         }
+        for (TradeEntity trade : trades) {
+            marketData.tradeExecuted(market, trade, side);
+        }
+        marketData.bookUpdated(market, book);
         return new PlacedOrder(order, trades);
     }
 
@@ -115,9 +122,11 @@ public class OrderExecutionService {
         if (!order.getStatus().isResting()) {
             throw new TradingRejectedException("order is " + order.getStatus() + " and cannot be cancelled");
         }
-        registry.book(order.getMarketId()).cancel(orderId.toString());
+        OrderBook book = registry.book(order.getMarketId());
+        book.cancel(orderId.toString());
         releaseRemainder(order);
         order.cancel();
+        marketData.bookUpdated(marketRepository.findById(order.getMarketId()).orElseThrow(), book);
         return order;
     }
 
@@ -135,6 +144,9 @@ public class OrderExecutionService {
             book.cancel(order.getId().toString());
             releaseRemainder(order);
             order.cancel();
+        }
+        if (!resting.isEmpty()) {
+            marketData.bookUpdated(marketRepository.findById(marketId).orElseThrow(), book);
         }
         return resting.size();
     }

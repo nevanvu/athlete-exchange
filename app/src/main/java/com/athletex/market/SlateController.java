@@ -18,11 +18,13 @@ public class SlateController {
     public record SlateSummary(UUID id, String name, SlateStatus status, Instant ipoOpensAt, Instant ipoClosesAt) {
     }
 
-    public record GameView(UUID id, UUID homeTeamId, UUID awayTeamId, GameStatus status, Instant startsAt) {
+    public record GameView(UUID id, UUID homeTeamId, String homeTeamCode, UUID awayTeamId, String awayTeamCode,
+                           GameStatus status, int period, int clockSecondsRemaining, Instant startsAt) {
     }
 
     public record MarketView(UUID id, UUID athleteId, String athleteName, String position, String teamCode,
                              UUID gameId, MarketStatus status, BigDecimal projectedFantasyPoints,
+                             BigDecimal projectedMinutes,
                              long reservePriceCents, int totalShares,
                              Long ipoClearingPriceCents, Long lastTradePriceCents,
                              Long fairValueCents, Long settlementValueCents) {
@@ -61,8 +63,14 @@ public class SlateController {
     public SlateDetail slate(@PathVariable UUID id) {
         SlateEntity slate = slateRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("unknown slate " + id));
-        List<GameView> games = gameRepository.findBySlateId(id).stream()
-                .map(g -> new GameView(g.getId(), g.getHomeTeamId(), g.getAwayTeamId(), g.getStatus(), g.getStartsAt()))
+        List<GameEntity> gameEntities = gameRepository.findBySlateId(id);
+        Map<UUID, String> teamCodes = teamRepository.findAllById(gameEntities.stream()
+                        .flatMap(g -> java.util.stream.Stream.of(g.getHomeTeamId(), g.getAwayTeamId())).distinct().toList())
+                .stream().collect(Collectors.toMap(TeamEntity::getId, TeamEntity::getCode));
+        List<GameView> games = gameEntities.stream()
+                .map(g -> new GameView(g.getId(), g.getHomeTeamId(), teamCodes.get(g.getHomeTeamId()), g.getAwayTeamId(),
+                        teamCodes.get(g.getAwayTeamId()), g.getStatus(), g.getPeriod(), g.getClockSecondsRemaining(),
+                        g.getStartsAt()))
                 .toList();
         List<AthleteMarketEntity> marketEntities = marketRepository.findBySlateId(id);
         Map<UUID, AthleteEntity> athletes = athleteRepository
@@ -79,7 +87,7 @@ public class SlateController {
                             athlete == null ? null : athlete.getName(),
                             athlete == null ? null : athlete.getPosition(),
                             team == null ? null : team.getCode(),
-                            m.getGameId(), m.getStatus(), m.getProjectedFantasyPoints(),
+                            m.getGameId(), m.getStatus(), m.getProjectedFantasyPoints(), m.getProjectedMinutes(),
                             Pricing.reservePriceCents(m.getProjectedFantasyPoints()), m.getTotalShares(),
                             m.getIpoClearingPriceCents(), m.getLastTradePriceCents(),
                             m.getFairValueCents(), m.getSettlementValueCents());

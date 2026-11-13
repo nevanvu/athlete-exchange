@@ -26,3 +26,9 @@ frontend/dist/
 
 ### jqwik ###
 .jqwik-database
+
+### TypeScript build info ###
+*.tsbuildinfo
+
+### Python ###
+__pycache__/

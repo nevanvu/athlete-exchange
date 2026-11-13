@@ -207,7 +207,7 @@ public final class NbaGameEngine {
 
     private EventEnvelope emit(EventPayload payload) {
         sequence++;
-        Instant at = spec.startAt().plusSeconds(elapsedSeconds);
+        Instant at = spec.timestampAt(elapsedSeconds);
         String id = Ulid.generate(at.toEpochMilli(), random);
         return EventEnvelope.create(id, SOURCE, spec.gameId(), spec.slateId(), sequence, at, payload);
     }

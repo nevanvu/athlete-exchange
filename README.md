@@ -48,7 +48,7 @@ Event contracts for everything above: [docs/event-schema.md](docs/event-schema.m
 
 ## Stack
 
-Java 21 · Spring Boot 4 · Spring Security (JWT) · Spring Data JPA · PostgreSQL + Flyway · Redis · Kafka (outbox pattern) · Gradle (Kotlin DSL, multi-module) · Testcontainers · Docker Compose · GitHub Actions · React frontend.
+Java 21 · Spring Boot 4 · Spring Security (JWT) · Spring Data JPA · PostgreSQL + Flyway · Redis · Kafka (outbox pattern) · Gradle (Kotlin DSL, multi-module) · Testcontainers · Docker Compose · GitHub Actions · React 19 + Vite + TypeScript frontend, STOMP over WebSocket.
 
 ## Build order
 
@@ -72,7 +72,41 @@ Java 21 · Spring Boot 4 · Spring Security (JWT) · Spring Data JPA · PostgreS
 
 ## Getting started
 
-Requires Java 21+ and Docker.
+Requires Java 21+, Docker, and Node 20+ for the frontend.
+
+### Run it live
+
+Four terminals: the exchange (with a two-minute IPO), the game simulator, the frontend, and the demo driver.
+
+```bash
+./gradlew :app:bootRun --args='--athletex.demo-seed.ipo-opens-in=20s --athletex.demo-seed.ipo-duration=120s --athletex.scheduler.fixed-delay-ms=2000'
+```
+
+```bash
+./gradlew :simulator:bootRun
+```
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Open http://localhost:5173, create an account (it starts with $10,000 of paper money) and bid in the IPO. Then start the games; the script waits for the IPO to close:
+
+```bash
+python3 scripts/live-demo.py start --speed 20
+```
+
+Prices move with every basket. Injure an athlete to watch the market halt, reprice and reopen 30 seconds later:
+
+```bash
+python3 scripts/live-demo.py injure "Avery Stone"
+```
+
+When both games are final the slate settles on its own and the portfolio shows realized profit. To start over, reset the database with `docker compose down -v`.
+
+The browser gets everything over one WebSocket (STOMP at `/ws`): `/topic/slates/{id}` carries the ticker, game clocks and phase changes, `/topic/markets/{id}` the order book, trades, fair value and halts, and `/user/queue/fills` the signed-in user's own fills. Market data is public; trading needs the JWT from sign-in.
+
+### Backend only
 
 ```bash
 ./gradlew :app:bootRun   # starts postgres/redis/kafka via Docker Compose automatically

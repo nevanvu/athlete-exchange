@@ -13,10 +13,11 @@ services:
       timeout: 3s
       retries: 10
 
-  # Redis and Kafka arrive with the live-data layer (M5+); enable with COMPOSE_PROFILES=streaming.
+  # Kafka carries game and market events (profile "streaming", activated by the app in dev).
+  # Redis is reserved for a hot-read cache once there is more than one app instance (profile "cache").
   redis:
     image: redis:7
-    profiles: ["streaming"]
+    profiles: ["cache"]
     ports:
       - "6379:6379"
 
