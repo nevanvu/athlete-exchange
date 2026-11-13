@@ -15,8 +15,20 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - name: Runner resources
+        run: nproc && free -h && docker info --format 'Docker {{.ServerVersion}}, {{.NCPU}} CPUs, {{.MemTotal}} bytes'
       - name: Build and test
         run: ./gradlew build
+      # Test reports include each container's log output, which the console does not.
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            */build/reports/tests/
+            */build/test-results/
+          retention-days: 7
 
   frontend:
     runs-on: ubuntu-latest
