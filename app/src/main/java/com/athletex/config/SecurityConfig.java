@@ -6,7 +6,9 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.athletex.ratelimit.RateLimiting;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -26,18 +28,21 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity http, RateLimiting rateLimiting) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**", "/actuator/health").permitAll()
                         // Market data is public; trading and portfolios need a token.
-                        .requestMatchers(HttpMethod.GET, "/api/slates/**", "/api/markets/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/slates/**", "/api/markets/**", "/api/leaderboard",
+                                "/api/feed").permitAll()
+                        .requestMatchers("/api/admin/**").hasAuthority("SCOPE_admin")
                         // STOMP authenticates on CONNECT (see StreamingConfig), not on the HTTP upgrade.
                         .requestMatchers("/ws/**").permitAll()
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
+                .addFilterAfter(rateLimiting.filter(), BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 

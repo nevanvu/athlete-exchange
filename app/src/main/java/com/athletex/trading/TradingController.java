@@ -39,7 +39,7 @@ public class TradingController {
                             int filledQuantity, OrderStatus status, long escrowCents, Instant createdAt) {
     }
 
-    public record PlacedOrderView(OrderView order, List<TradeView> trades) {
+    public record PlacedOrderView(OrderView order, List<TradeView> trades, boolean selfTradePrevented) {
     }
 
     public record BookView(UUID marketId, MarketStatus status, String haltReason, Instant resumeAfter,
@@ -69,7 +69,8 @@ public class TradingController {
         PlacedOrder placed = orderService.place(userId(jwt), request.marketId(), request.side(), request.type(),
                 request.priceCents(), request.quantity());
         return ResponseEntity.status(HttpStatus.CREATED).body(new PlacedOrderView(
-                toView(placed.order()), placed.trades().stream().map(TradingController::toView).toList()));
+                toView(placed.order()), placed.trades().stream().map(TradingController::toView).toList(),
+                placed.selfTradePrevented()));
     }
 
     @GetMapping("/orders")

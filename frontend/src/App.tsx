@@ -2,11 +2,13 @@ import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth";
 import { money } from "./format";
 import { useStreamStatus } from "./stream";
+import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { MarketPage } from "./pages/MarketPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
 import { SignInPage } from "./pages/SignInPage";
 import { SlatePage } from "./pages/SlatePage";
 import { SlatesPage } from "./pages/SlatesPage";
+import { SurveillancePage } from "./pages/SurveillancePage";
 
 function LiveIndicator() {
   const status = useStreamStatus();
@@ -20,7 +22,7 @@ function LiveIndicator() {
 }
 
 export function App() {
-  const { session, wallet, signOut } = useAuth();
+  const { session, wallet, me, signOut } = useAuth();
   return (
     <div className="app">
       <a className="skip" href="#main">Skip to content</a>
@@ -28,7 +30,9 @@ export function App() {
         <Link to="/" className="wordmark">Athlete Exchange</Link>
         <nav className="topbar__nav" aria-label="Main">
           <NavLink to="/" end>Markets</NavLink>
+          <NavLink to="/leaderboard">Leaderboard</NavLink>
           <NavLink to="/portfolio">Portfolio</NavLink>
+          {me?.admin && <NavLink to="/surveillance">Surveillance</NavLink>}
         </nav>
         <div className="topbar__account">
           <LiveIndicator />
@@ -50,6 +54,8 @@ export function App() {
           <Route path="/slates/:slateId" element={<SlatePage />} />
           <Route path="/slates/:slateId/markets/:marketId" element={<MarketPage />} />
           <Route path="/portfolio" element={session ? <PortfolioPage /> : <Navigate to="/sign-in" replace />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/surveillance" element={session ? <SurveillancePage /> : <Navigate to="/sign-in" replace />} />
           <Route path="/sign-in" element={<SignInPage />} />
           <Route path="*" element={<p className="empty">That page doesn’t exist. <Link to="/">Back to markets</Link></p>} />
         </Routes>

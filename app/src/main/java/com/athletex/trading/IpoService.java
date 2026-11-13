@@ -11,6 +11,7 @@ import com.athletex.market.Pricing;
 import com.athletex.market.SlateEntity;
 import com.athletex.market.SlateRepository;
 import com.athletex.market.SlateStatus;
+import com.athletex.social.FeedService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -33,17 +34,23 @@ public class IpoService {
     private final SlateRepository slateRepository;
     private final PositionRepository positionRepository;
     private final LedgerService ledgerService;
+    private final PositionLimits limits;
+    private final FeedService feed;
 
     public IpoService(IpoBidRepository bidRepository,
                       AthleteMarketRepository marketRepository,
                       SlateRepository slateRepository,
                       PositionRepository positionRepository,
-                      LedgerService ledgerService) {
+                      LedgerService ledgerService,
+                      PositionLimits limits,
+                      FeedService feed) {
         this.bidRepository = bidRepository;
         this.marketRepository = marketRepository;
         this.slateRepository = slateRepository;
         this.positionRepository = positionRepository;
         this.ledgerService = ledgerService;
+        this.limits = limits;
+        this.feed = feed;
     }
 
     @Transactional
@@ -58,6 +65,7 @@ public class IpoService {
         if (slate.getStatus() != SlateStatus.IPO) {
             throw new TradingRejectedException("slate is " + slate.getStatus() + "; IPO bidding is not open");
         }
+        limits.checkBuy(userId, marketId, quantity);
         IpoBidEntity bid = new IpoBidEntity(userId, marketId, maxPriceCents, quantity);
         ledgerService.lockFunds("ipobid:" + bid.getId() + ":lock", userId, bid.escrowCents());
         return bidRepository.save(bid);
@@ -80,10 +88,21 @@ public class IpoService {
     /** Clears every market in the slate. Idempotent: already-cleared markets are skipped. */
     @Transactional
     public void clearSlate(UUID slateId) {
+        int sold = 0;
+        int cleared = 0;
+        AthleteMarketEntity top = null;
         for (AthleteMarketEntity market : marketRepository.findBySlateId(slateId)) {
             if (market.getIpoClearingPriceCents() == null) {
-                clearMarket(market);
+                sold += clearMarket(market);
+                cleared++;
+                if (top == null || market.getIpoClearingPriceCents() > top.getIpoClearingPriceCents()) {
+                    top = market;
+                }
             }
+        }
+        if (cleared > 0) {
+            feed.ipoCleared(slateRepository.findById(slateId).orElseThrow(), sold, cleared,
+                    top == null ? null : feed.athlete(top), top == null ? 0 : top.getIpoClearingPriceCents());
         }
     }
 
@@ -98,7 +117,8 @@ public class IpoService {
         }
     }
 
-    private void clearMarket(AthleteMarketEntity market) {
+    /** Returns the number of shares sold to bidders (the rest go to the house). */
+    private int clearMarket(AthleteMarketEntity market) {
         List<IpoBidEntity> bids = openBidsBestFirst(market.getId());
         long reserve = Pricing.reservePriceCents(market.getProjectedFantasyPoints());
         int supply = market.getTotalShares();
@@ -122,6 +142,7 @@ public class IpoService {
         market.setLastTradePriceCents(clearing);
         log.info("IPO cleared market {} at {} cents: {} bids, {} unsold -> house",
                 market.getId(), clearing, bids.size(), remaining);
+        return supply - remaining;
     }
 
     /**

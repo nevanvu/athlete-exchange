@@ -17,6 +17,7 @@ import com.athletex.market.SlateEntity;
 import com.athletex.market.SlateLifecycleService;
 import com.athletex.market.SlateRepository;
 import com.athletex.market.SlateStatus;
+import com.athletex.social.FeedService;
 import com.athletex.trading.OrderRepository;
 import com.athletex.trading.OrderStatus;
 import com.athletex.trading.PositionEntity;
@@ -63,6 +64,7 @@ public class SettlementService {
     private final LedgerService ledgerService;
     private final SlateLifecycleService lifecycle;
     private final FairValueService fairValueService;
+    private final FeedService feed;
 
     public SettlementService(SlateRepository slateRepository,
                              AthleteMarketRepository marketRepository,
@@ -73,7 +75,8 @@ public class SettlementService {
                              SettlementPayoutRepository payoutRepository,
                              LedgerService ledgerService,
                              SlateLifecycleService lifecycle,
-                             FairValueService fairValueService) {
+                             FairValueService fairValueService,
+                             FeedService feed) {
         this.slateRepository = slateRepository;
         this.marketRepository = marketRepository;
         this.statsRepository = statsRepository;
@@ -84,6 +87,7 @@ public class SettlementService {
         this.ledgerService = ledgerService;
         this.lifecycle = lifecycle;
         this.fairValueService = fairValueService;
+        this.feed = feed;
     }
 
     @Transactional
@@ -140,6 +144,8 @@ public class SettlementService {
         }
         payoutRepository.saveAll(payouts);
         lifecycle.transition(slateId, SlateStatus.SETTLED, "settlement:" + runId);
+        markets.stream().max(java.util.Comparator.comparingLong(AthleteMarketEntity::getSettlementValueCents))
+                .ifPresent(top -> feed.settled(slate, run.getTotalPaidCents(), feed.athlete(top), top.getSettlementValueCents()));
         log.info("settled slate {}: {} market(s), {} payout(s), {} cents paid", slateId, markets.size(),
                 payouts.size(), totalPaid);
         return new Result(Outcome.SETTLED, null);

@@ -40,9 +40,10 @@ class OrderBookPropertyTest {
                 String id = "o" + i;
                 Side side = random.nextBoolean() ? Side.BUY : Side.SELL;
                 int quantity = 1 + random.nextInt(50);
-                NewOrder order = random.nextInt(100) < 15
+                NewOrder order = (random.nextInt(100) < 15
                         ? NewOrder.market(id, side, quantity)
-                        : NewOrder.limit(id, side, 90 + random.nextInt(21), quantity);
+                        : NewOrder.limit(id, side, 90 + random.nextInt(21), quantity))
+                        .ownedBy("trader-" + random.nextInt(4)); // few owners: self-crosses are common
 
                 MatchResult actual = book.submit(order);
                 MatchResult expected = reference.submit(order);

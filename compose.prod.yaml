@@ -1,0 +1,95 @@
+# The whole exchange from source, in one command:
+#
+#   JWT_SECRET=$(openssl rand -hex 32) docker compose -f compose.prod.yaml up --build -d
+#
+# then open http://localhost:8088. See .env.example for the other settings.
+name: athlete-exchange-prod
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: athletex
+      POSTGRES_USER: athletex
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-athletex}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U athletex"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  kafka:
+    image: apache/kafka:4.1.0
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_HEAP_OPTS: -Xmx512m -Xms512m
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  exchange:
+    build:
+      context: .
+      args:
+        MODULE: app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/athletex
+      SPRING_DATASOURCE_USERNAME: athletex
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-athletex}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ATHLETEX_SECURITY_JWTSECRET: ${JWT_SECRET:?Set JWT_SECRET to a random string of at least 32 characters}
+      ATHLETEX_ADMINUSERNAMES: ${ADMIN_USERNAMES:-}
+      ATHLETEX_DEMOSEED_ENABLED: ${DEMO_SEED:-true}
+      ATHLETEX_DEMOSEED_IPOOPENSIN: ${DEMO_IPO_OPENS_IN:-1m}
+      ATHLETEX_DEMOSEED_IPODURATION: ${DEMO_IPO_DURATION:-10m}
+
+  simulator:
+    build:
+      context: .
+      args:
+        MODULE: simulator
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    # Operator tool (it can injure athletes in live markets): reachable from this machine only.
+    ports:
+      - "127.0.0.1:${SIMULATOR_PORT:-8081}:8081"
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - exchange
+    ports:
+      - "${WEB_PORT:-8088}:80"
+
+volumes:
+  pgdata:
+  kafkadata:

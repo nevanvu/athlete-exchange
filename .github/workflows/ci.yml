@@ -45,3 +45,12 @@ jobs:
       - run: npm ci
       - name: Typecheck, test and build
         run: npm run build && npm test
+
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production images
+        env:
+          JWT_SECRET: ci-build-only-not-a-real-secret-0000000000
+        run: docker compose -f compose.prod.yaml build

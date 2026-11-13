@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api, setAuthToken, type Wallet } from "./api";
+import { api, setAuthToken, type Me, type Wallet } from "./api";
 import { setStreamToken, useStream } from "./stream";
 
 interface Session {
@@ -10,6 +10,8 @@ interface Session {
 interface AuthState {
   session: Session | null;
   wallet: Wallet | null;
+  me: Me | null;
+  setMe: (me: Me) => void;
   signIn: (username: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   signOut: () => void;
@@ -46,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return restored;
   });
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
   const [fillVersion, setFillVersion] = useState(0);
 
   useEffect(() => {
@@ -65,6 +68,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(refreshWallet, [refreshWallet]);
 
+  useEffect(() => {
+    if (!session) {
+      setMe(null);
+      return;
+    }
+    api.me().then(setMe).catch(() => setMe(null));
+  }, [session]);
+
   useStream(session ? "/user/queue/fills" : null, () => {
     setFillVersion((v) => v + 1);
     refreshWallet();
@@ -80,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       wallet,
+      me,
+      setMe,
       fillVersion,
       refreshWallet,
       signIn: async (username, password) => start(await api.login(username, password)),
@@ -90,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(null);
       },
     }),
-    [session, wallet, fillVersion, refreshWallet, start],
+    [session, wallet, me, fillVersion, refreshWallet, start],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

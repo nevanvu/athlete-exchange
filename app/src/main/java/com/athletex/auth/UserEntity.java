@@ -26,6 +26,9 @@ public class UserEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "portfolio_public", nullable = false)
+    private boolean portfolioPublic;
+
     protected UserEntity() {
     }
 
@@ -55,5 +58,13 @@ public class UserEntity {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public boolean isPortfolioPublic() {
+        return portfolioPublic;
+    }
+
+    public void setPortfolioPublic(boolean portfolioPublic) {
+        this.portfolioPublic = portfolioPublic;
     }
 }

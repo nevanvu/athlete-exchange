@@ -141,4 +141,29 @@ class OrderBookTest {
         assertThat(result.restingQuantity()).isEqualTo(5);
         assertThat(List.of(result.orderId())).containsExactly("o1");
     }
+
+    @Test
+    void selfTradePreventionStopsAtTheOwnersOwnOrder() {
+        book.submit(NewOrder.limit("other", Side.SELL, 100, 5).ownedBy("bob"));
+        book.submit(NewOrder.limit("mine", Side.SELL, 101, 5).ownedBy("alice"));
+        book.submit(NewOrder.limit("other2", Side.SELL, 102, 5).ownedBy("bob"));
+
+        MatchResult result = book.submit(NewOrder.limit("buy", Side.BUY, 105, 15).ownedBy("alice"));
+
+        // Fills against bob's better-priced order stand; matching stops at alice's own ask.
+        assertThat(result.fills()).containsExactly(new Fill("buy", "other", 100, 5));
+        assertThat(result.selfTradePrevented()).isTrue();
+        assertThat(result.restingQuantity()).as("never rests across its own order").isZero();
+        assertThat(result.cancelledQuantity()).isEqualTo(10);
+        assertThat(book.bestAsk()).hasValue(101);
+        assertThat(book.bestBid()).isEmpty();
+    }
+
+    @Test
+    void ordersWithoutAnOwnerAreNotRestricted() {
+        book.submit(NewOrder.limit("s", Side.SELL, 100, 5));
+        MatchResult result = book.submit(NewOrder.limit("b", Side.BUY, 100, 5));
+        assertThat(result.fullyFilled()).isTrue();
+        assertThat(result.selfTradePrevented()).isFalse();
+    }
 }

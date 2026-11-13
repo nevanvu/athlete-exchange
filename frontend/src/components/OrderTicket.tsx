@@ -55,8 +55,10 @@ export function OrderTicket({ marketId, book, slateStatus, onPlaced }: {
     try {
       const placed = await api.placeOrder({ marketId, side, type, priceCents, quantity: count });
       const filled = placed.order.filledQuantity;
-      const text =
-        filled === 0
+      const text = placed.selfTradePrevented
+        ? `Stopped before trading with your own order${filled > 0 ? ` after filling ${qty(filled)}` : ""}. ` +
+          "Cancel your resting order first; the rest of this one was cancelled."
+        : filled === 0
           ? `Order placed: ${verb.toLowerCase()} ${qty(count)} at ${money(priceCents)}. It rests on the book until matched.`
           : filled === count
             ? `Filled: ${verb === "Buy" ? "bought" : "sold"} ${qty(filled)} shares.`

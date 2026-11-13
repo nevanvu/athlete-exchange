@@ -169,10 +169,14 @@ def main():
     m1, m2, m3 = markets[0], markets[1], markets[2]
     r1, r2, r3 = m1["reservePriceCents"], m2["reservePriceCents"], m3["reservePriceCents"]
 
-    step(f"bidding on {m1['athleteName']} (1000 shares on offer, reserve {money(r1)})")
+    step(f"bidding on {m1['athleteName']} (1000 shares on offer, reserve {money(r1)}, at most 250 per trader)")
+    backers = {name: login(name + str(int(time.time()) % 100000)) for name in ("dave", "erin", "frank")}
     bids = [
-        ("alice", alice, m1, r1 + 150, 200),
-        ("bob", bob, m1, r1 + 100, 850),
+        ("alice", alice, m1, r1 + 150, 250),
+        ("dave", backers["dave"], m1, r1 + 120, 200),
+        ("bob", bob, m1, r1 + 100, 250),
+        ("erin", backers["erin"], m1, r1 + 90, 200),
+        ("frank", backers["frank"], m1, r1 + 80, 200),
         ("carol", carol, m1, r1 - 50, 200),   # below reserve: will be refunded
     ]
     for name, token, m, price, qty in bids:
@@ -180,7 +184,7 @@ def main():
                            {"marketId": m["id"], "maxPriceCents": price, "quantity": qty})
         outcome = resp.get("status") or resp.get("detail") or resp
         print(f"    {name:<6} bids {qty:>4} x {money(price):>8}  -> {status} {outcome}")
-    print("    demand at or above reserve = 200 + 850 = 1050 > 1000, so the auction is oversubscribed")
+    print("    demand at or above reserve = 250 + 200 + 250 + 200 + 200 = 1100 > 1000, so the auction is oversubscribed")
 
     step(f"bidding on {m2['athleteName']} and {m3['athleteName']} (undersubscribed)")
     for name, token, m, price, qty in [("alice", alice, m2, r2 + 50, 50), ("carol", carol, m3, r3 + 20, 300)]:
@@ -191,8 +195,8 @@ def main():
     step("escrow: max price x quantity is locked while bids are open")
     show_wallets(traders)
 
-    status, resp = api("POST", "/api/ipo/bids", alice, {"marketId": m1["id"], "maxPriceCents": 10_000, "quantity": 5000})
-    print(f"\n    alice tries to bid $50,000,000 more than she has -> {status}: {resp['detail']}")
+    status, resp = api("POST", "/api/ipo/bids", alice, {"marketId": m1["id"], "maxPriceCents": 1_200, "quantity": 500})
+    print(f"\n    alice tries to corner the market with 500 more shares -> {status}: {resp['detail']}")
 
     # ------------------------------------------------------------ clearing
     banner("PHASE 2 — auction clears, market opens")
@@ -202,13 +206,14 @@ def main():
         cleared = by_id[m["id"]]
         print(f"    {m['athleteName']:<18} reserve {money(m['reservePriceCents']):>8}  "
               f"cleared at {money(cleared['ipoClearingPriceCents']):>8}")
-    print(f"\n    {m1['athleteName']}: alice's higher bid fills in full, bob is the marginal bidder and sets the")
-    print(f"    price ({money(r1 + 100)}); both pay that price, alice's extra escrow is refunded, carol was below reserve.")
+    print(f"\n    {m1['athleteName']}: bids fill from the highest down; frank is the marginal bidder and sets the")
+    print(f"    price ({money(r1 + 80)}) for everyone, gets the last 100 shares, and the rest of each winner's")
+    print(f"    escrow above that price is refunded. carol bid below the reserve and is refunded in full.")
     print(f"    {m2['athleteName']} / {m3['athleteName']}: demand < supply, so they clear at the reserve and the")
     print(f"    house keeps the unsold shares.")
 
     step("bid outcomes")
-    for name, token in traders.items():
+    for name, token in {**traders, **backers}.items():
         _, mine = api("GET", "/api/ipo/bids", token)
         for b in mine:
             print(f"    {name:<6} {names[b['marketId']]:<18} {b['quantity']:>4} @ max {money(b['maxPriceCents']):>8} "

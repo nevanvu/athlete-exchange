@@ -13,13 +13,15 @@ Needs the exchange on :8080 and the simulator on :8081 (./gradlew :app:bootRun, 
 """
 import argparse
 import json
+import os
 import sys
 import time
 import urllib.error
 import urllib.request
 
-EXCHANGE = "http://localhost:8080"
-SIMULATOR = "http://localhost:8081"
+# Override for the deployed stack, e.g. EXCHANGE_URL=http://localhost:8088 SIMULATOR_URL=http://localhost:8081
+EXCHANGE = os.environ.get("EXCHANGE_URL", "http://localhost:8080")
+SIMULATOR = os.environ.get("SIMULATOR_URL", "http://localhost:8081")
 
 
 def call(method, url, body=None):

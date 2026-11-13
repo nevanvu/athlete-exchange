@@ -6,6 +6,7 @@ import com.athletex.market.MarketStatus;
 import com.athletex.market.SlateRepository;
 import com.athletex.market.SlateStatus;
 import com.athletex.outbox.OutboxService;
+import com.athletex.social.FeedService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -40,6 +41,7 @@ public class HaltService {
     private final SlateRepository slateRepository;
     private final MarketHaltRepository haltRepository;
     private final OutboxService outbox;
+    private final FeedService feed;
     private final String topic;
     private final double threshold;
     private final long minMoveCents;
@@ -49,6 +51,7 @@ public class HaltService {
                        SlateRepository slateRepository,
                        MarketHaltRepository haltRepository,
                        OutboxService outbox,
+                       FeedService feed,
                        @Value("${athletex.kafka.market-events-topic:market-events}") String topic,
                        @Value("${athletex.halts.threshold:0.15}") double threshold,
                        @Value("${athletex.halts.min-move-cents:100}") long minMoveCents,
@@ -57,6 +60,7 @@ public class HaltService {
         this.slateRepository = slateRepository;
         this.haltRepository = haltRepository;
         this.outbox = outbox;
+        this.feed = feed;
         this.topic = topic;
         this.threshold = threshold;
         this.minMoveCents = minMoveCents;
@@ -95,6 +99,7 @@ public class HaltService {
                 fairValueAfterCents, now, resumeAfter));
         outbox.enqueue(topic, market.getId().toString(), new MarketHalted("market_halted", market.getId(),
                 market.getSlateId(), reason, triggerEventId, fairValueBeforeCents, fairValueAfterCents, now, resumeAfter));
+        feed.halted(market, reason, fairValueBeforeCents, fairValueAfterCents);
         log.info("market {} halted until {}: {} (fair value {} -> {})", market.getId(), resumeAfter, reason,
                 fairValueBeforeCents, fairValueAfterCents);
         return true;

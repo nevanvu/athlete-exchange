@@ -10,7 +10,8 @@ function Pnl({ cents }: { cents: number }) {
 }
 
 export function PortfolioPage() {
-  const { fillVersion, refreshWallet } = useAuth();
+  const { fillVersion, refreshWallet, me, setMe } = useAuth();
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +32,15 @@ export function PortfolioPage() {
     } finally {
       load();
       refreshWallet();
+    }
+  }
+
+  async function togglePrivacy(portfolioPublic: boolean) {
+    setSavingPrivacy(true);
+    try {
+      setMe(await api.setPrivacy(portfolioPublic));
+    } finally {
+      setSavingPrivacy(false);
     }
   }
 
@@ -82,6 +92,22 @@ export function PortfolioPage() {
           </table>
         )}
       </section>
+
+      {me && (
+        <section className="panel">
+          <h2>Privacy</h2>
+          <label className="check">
+            <input type="checkbox" checked={me.portfolioPublic} disabled={savingPrivacy}
+              onChange={(e) => togglePrivacy(e.target.checked)} />
+            Show my name on leaderboards and in the feed
+          </label>
+          <p className="muted">
+            {me.portfolioPublic
+              ? `Others see you as ${me.username}.`
+              : "Others see you as “Anonymous trader”. Your holdings are never shown to anyone else."}
+          </p>
+        </section>
+      )}
 
       {orders.length > 0 && (
         <section className="panel">

@@ -64,6 +64,7 @@ public class MarketStreamRelay {
                 send("/topic/slates/" + slate, event);
             }
             case "slate_transitioned", "game_updated" -> send("/topic/slates/" + slate, event);
+            case "feed_item" -> send("/topic/feed", event);
             default -> log.debug("not streamed: {}", type);
         }
     }
