@@ -99,6 +99,48 @@ export interface Order {
 export interface PlacedOrder {
   order: Order;
   trades: Trade[];
+  /** The order stopped at your own resting order; the rest was cancelled. */
+  selfTradePrevented: boolean;
+}
+
+export interface LeaderboardRow {
+  rank: number;
+  name: string;
+  valueCents: number;
+  profitCents: number;
+  returnFraction: number;
+  you: boolean;
+}
+
+export interface FeedItem {
+  id: string;
+  kind: "HALT" | "BIG_TRADE" | "IPO" | "PAYOUT";
+  slateId: string | null;
+  athleteMarketId: string | null;
+  headline: string;
+  detail: string | null;
+  occurredAt: string;
+}
+
+export interface Me {
+  username: string;
+  portfolioPublic: boolean;
+  admin: boolean;
+}
+
+export interface SurveillanceAlert {
+  id: string;
+  kind: "SELF_TRADE_BLOCKED" | "ROUND_TRIP";
+  marketId: string;
+  slateId: string;
+  athlete: string | null;
+  userA: string;
+  userB: string;
+  occurrences: number;
+  detail: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  status: "OPEN" | "DISMISSED";
 }
 
 export interface IpoBid {
@@ -208,4 +250,14 @@ export const api = {
   cancelIpoBid: (id: string) => request<IpoBid>("DELETE", `/api/ipo/bids/${id}`),
 
   portfolio: () => request<Portfolio>("GET", "/api/portfolio"),
+
+  me: () => request<Me>("GET", "/api/me"),
+  setPrivacy: (portfolioPublic: boolean) => request<Me>("PUT", "/api/me/privacy", { portfolioPublic }),
+  leaderboard: () => request<LeaderboardRow[]>("GET", "/api/leaderboard"),
+  slateLeaderboard: (slateId: string) => request<LeaderboardRow[]>("GET", `/api/slates/${slateId}/leaderboard`),
+  feed: () => request<FeedItem[]>("GET", "/api/feed"),
+
+  surveillance: (includeDismissed: boolean) =>
+    request<SurveillanceAlert[]>("GET", `/api/admin/surveillance?includeDismissed=${includeDismissed}`),
+  dismissAlert: (id: string) => request<SurveillanceAlert>("POST", `/api/admin/surveillance/${id}/dismiss`),
 };

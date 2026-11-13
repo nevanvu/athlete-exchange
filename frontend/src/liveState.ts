@@ -2,7 +2,7 @@
 // The page loads a snapshot first, then folds every message in arrival order; Kafka keeps
 // a market's messages in order and STOMP preserves order per subscription.
 
-import type { Book, FairValueTick, Game, Level, Market, MarketStatus, SlateDetail, SlateStatus, Trade } from "./api";
+import type { Book, FairValueTick, FeedItem, Game, Level, Market, MarketStatus, SlateDetail, SlateStatus, Trade } from "./api";
 
 export type StreamEvent =
   | { type: "fair_value_updated"; athleteMarketId: string; fairValueCents: number; computedAt: string;
@@ -14,7 +14,9 @@ export type StreamEvent =
   | { type: "market_halted"; athleteMarketId: string; reason: string; resumeAfter: string | null }
   | { type: "market_resumed"; athleteMarketId: string }
   | { type: "slate_transitioned"; slateId: string; to: SlateStatus }
-  | { type: "game_updated"; gameId: string; status: Game["status"]; period: number; clockSecondsRemaining: number };
+  | { type: "game_updated"; gameId: string; status: Game["status"]; period: number; clockSecondsRemaining: number }
+  | { type: "feed_item"; id: string; kind: FeedItem["kind"]; slateId: string | null; athleteMarketId: string | null;
+      headline: string; detail: string | null; occurredAt: string };
 
 function updateMarket(markets: Market[], id: string, change: Partial<Market>): Market[] {
   let changed = false;
@@ -51,6 +53,13 @@ export function applySlateEvent(slate: SlateDetail, event: StreamEvent): SlateDe
     default:
       return slate;
   }
+}
+
+/** Feed: newest first, a streamed item is added once even if it is also in the loaded page. */
+export function applyFeedEvent(items: FeedItem[], event: StreamEvent, max = 40): FeedItem[] {
+  if (event.type !== "feed_item" || items.some((i) => i.id === event.id)) return items;
+  const { type: _type, ...item } = event;
+  return [item, ...items].slice(0, max);
 }
 
 export interface MarketView {

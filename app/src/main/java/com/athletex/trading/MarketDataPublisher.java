@@ -5,6 +5,7 @@ import com.athletex.matching.BookSnapshot;
 import com.athletex.matching.OrderBook;
 import com.athletex.matching.Side;
 import com.athletex.outbox.OutboxService;
+import com.athletex.social.FeedService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -31,15 +32,19 @@ public class MarketDataPublisher {
     }
 
     private final OutboxService outbox;
+    private final FeedService feed;
     private final String topic;
 
-    public MarketDataPublisher(OutboxService outbox,
+    public MarketDataPublisher(OutboxService outbox, FeedService feed,
                                @Value("${athletex.kafka.market-events-topic:market-events}") String topic) {
         this.outbox = outbox;
+        this.feed = feed;
         this.topic = topic;
     }
 
     void tradeExecuted(AthleteMarketEntity market, TradeEntity trade, Side takerSide) {
+        UUID taker = takerSide == Side.BUY ? trade.getBuyerUserId() : trade.getSellerUserId();
+        feed.traded(market, taker, takerSide == Side.BUY, trade.getPriceCents(), trade.getQuantity());
         outbox.enqueue(topic, market.getId().toString(), new TradeExecuted("trade_executed", market.getId(),
                 market.getSlateId(), trade.getId(), trade.getPriceCents(), trade.getQuantity(), takerSide,
                 trade.getBuyerUserId(), trade.getSellerUserId(), trade.getExecutedAt()));

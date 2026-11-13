@@ -103,3 +103,17 @@ describe("format", () => {
     expect(gameClock("FINAL", 4, 0)).toBe("Final");
   });
 });
+
+describe("applyFeedEvent", () => {
+  it("adds streamed items newest first, once", async () => {
+    const { applyFeedEvent } = await import("./liveState");
+    const event = {
+      type: "feed_item" as const, id: "f1", kind: "HALT" as const, slateId: "s1", athleteMarketId: "m1",
+      headline: "Avery Stone halted: injury: athlete ruled OUT.", detail: null, occurredAt: "2026-11-12T20:00:00Z",
+    };
+    const once = applyFeedEvent([], event);
+    expect(once).toHaveLength(1);
+    expect(once[0]).not.toHaveProperty("type");
+    expect(applyFeedEvent(once, event)).toBe(once);
+  });
+});

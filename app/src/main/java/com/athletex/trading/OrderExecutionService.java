@@ -17,6 +17,7 @@ import com.athletex.matching.NewOrder;
 import com.athletex.matching.OrderBook;
 import com.athletex.matching.OrderType;
 import com.athletex.matching.Side;
+import com.athletex.surveillance.SurveillanceService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -40,6 +41,8 @@ public class OrderExecutionService {
     private final SlateRepository slateRepository;
     private final LedgerService ledgerService;
     private final MarketDataPublisher marketData;
+    private final PositionLimits limits;
+    private final SurveillanceService surveillance;
 
     public OrderExecutionService(MatchingEngineRegistry registry,
                                  OrderRepository orderRepository,
@@ -48,7 +51,9 @@ public class OrderExecutionService {
                                  AthleteMarketRepository marketRepository,
                                  SlateRepository slateRepository,
                                  LedgerService ledgerService,
-                                 MarketDataPublisher marketData) {
+                                 MarketDataPublisher marketData,
+                                 PositionLimits limits,
+                                 SurveillanceService surveillance) {
         this.registry = registry;
         this.orderRepository = orderRepository;
         this.tradeRepository = tradeRepository;
@@ -57,6 +62,8 @@ public class OrderExecutionService {
         this.slateRepository = slateRepository;
         this.ledgerService = ledgerService;
         this.marketData = marketData;
+        this.limits = limits;
+        this.surveillance = surveillance;
     }
 
     @Transactional
@@ -83,6 +90,7 @@ public class OrderExecutionService {
                 type == OrderType.LIMIT ? priceCents : null, quantity);
 
         if (side == Side.BUY) {
+            limits.checkBuy(userId, marketId, quantity);
             long required = type == OrderType.LIMIT ? priceCents * quantity : sweepCost(book, quantity);
             if (required > 0) {
                 ledgerService.lockFunds("order:" + order.getId() + ":lock", userId, required);
@@ -98,7 +106,7 @@ public class OrderExecutionService {
         order = orderRepository.save(order);
 
         MatchResult result = book.submit(new NewOrder(order.getId().toString(), side, type,
-                type == OrderType.LIMIT ? priceCents : 0L, quantity));
+                type == OrderType.LIMIT ? priceCents : 0L, quantity, userId.toString()));
 
         List<TradeEntity> trades = new ArrayList<>();
         for (Fill fill : result.fills()) {
@@ -108,11 +116,14 @@ public class OrderExecutionService {
             releaseRemainder(order);
             order.cancel();
         }
+        if (result.selfTradePrevented()) {
+            surveillance.selfTradeBlocked(userId, marketId);
+        }
         for (TradeEntity trade : trades) {
             marketData.tradeExecuted(market, trade, side);
         }
         marketData.bookUpdated(market, book);
-        return new PlacedOrder(order, trades);
+        return new PlacedOrder(order, trades, result.selfTradePrevented());
     }
 
     @Transactional

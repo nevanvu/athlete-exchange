@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface TradeRepository extends JpaRepository<TradeEntity, UUID> {
 
     List<TradeEntity> findTop50ByMarketIdOrderByExecutedAtDesc(UUID marketId);
+
+    List<TradeEntity> findByExecutedAtAfter(java.time.Instant after);
 }

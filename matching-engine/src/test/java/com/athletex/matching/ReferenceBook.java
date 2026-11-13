@@ -16,13 +16,15 @@ class ReferenceBook {
         final Side side;
         final long price;
         final long arrival;
+        final String owner;
         int remaining;
 
-        Rest(String id, Side side, long price, long arrival, int remaining) {
+        Rest(String id, Side side, long price, long arrival, String owner, int remaining) {
             this.id = id;
             this.side = side;
             this.price = price;
             this.arrival = arrival;
+            this.owner = owner;
             this.remaining = remaining;
         }
     }
@@ -33,6 +35,7 @@ class ReferenceBook {
     MatchResult submit(NewOrder order) {
         List<Fill> fills = new ArrayList<>();
         int remaining = order.quantity();
+        boolean selfTrade = false;
 
         while (remaining > 0) {
             Rest best = resting.stream()
@@ -49,6 +52,10 @@ class ReferenceBook {
             if (!crosses) {
                 break;
             }
+            if (order.owner() != null && order.owner().equals(best.owner)) {
+                selfTrade = true;
+                break;
+            }
             int quantity = Math.min(remaining, best.remaining);
             best.remaining -= quantity;
             remaining -= quantity;
@@ -61,14 +68,14 @@ class ReferenceBook {
         int restingQty = 0;
         int cancelled = 0;
         if (remaining > 0) {
-            if (order.type() == OrderType.LIMIT) {
-                resting.add(new Rest(order.orderId(), order.side(), order.priceCents(), arrivals++, remaining));
+            if (order.type() == OrderType.LIMIT && !selfTrade) {
+                resting.add(new Rest(order.orderId(), order.side(), order.priceCents(), arrivals++, order.owner(), remaining));
                 restingQty = remaining;
             } else {
                 cancelled = remaining;
             }
         }
-        return new MatchResult(order.orderId(), List.copyOf(fills), restingQty, cancelled);
+        return new MatchResult(order.orderId(), List.copyOf(fills), restingQty, cancelled, selfTrade);
     }
 
     int cancel(String orderId) {

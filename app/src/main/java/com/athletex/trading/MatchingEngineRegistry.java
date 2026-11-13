@@ -76,7 +76,7 @@ public class MatchingEngineRegistry {
             // Resting orders never crossed when they were persisted, so replaying them in
             // arrival order produces no fills and restores price-time priority exactly.
             var result = book.submit(NewOrder.limit(order.getId().toString(), order.getSide(),
-                    order.getPriceCents(), order.getRemainingQuantity()));
+                    order.getPriceCents(), order.getRemainingQuantity()).ownedBy(order.getUserId().toString()));
             if (!result.fills().isEmpty()) {
                 throw new IllegalStateException("resting orders crossed during rebuild; order " + order.getId());
             }

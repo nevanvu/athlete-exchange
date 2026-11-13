@@ -24,12 +24,14 @@ public final class OrderBook {
         final String orderId;
         final Side side;
         final long priceCents;
+        final String owner;
         int remaining;
 
-        RestingOrder(String orderId, Side side, long priceCents, int remaining) {
+        RestingOrder(String orderId, Side side, long priceCents, String owner, int remaining) {
             this.orderId = orderId;
             this.side = side;
             this.priceCents = priceCents;
+            this.owner = owner;
             this.remaining = remaining;
         }
     }
@@ -47,6 +49,7 @@ public final class OrderBook {
 
         List<Fill> fills = new ArrayList<>();
         int remaining = order.quantity();
+        boolean selfTrade = false;
         NavigableMap<Long, Deque<RestingOrder>> opposite = order.side() == Side.BUY ? asks : bids;
 
         while (remaining > 0 && !opposite.isEmpty()) {
@@ -56,6 +59,10 @@ public final class OrderBook {
             }
             Deque<RestingOrder> level = opposite.firstEntry().getValue();
             RestingOrder maker = level.peekFirst();
+            if (order.owner() != null && order.owner().equals(maker.owner)) {
+                selfTrade = true; // self-trade prevention: stop here, cancel what is left
+                break;
+            }
             int quantity = Math.min(remaining, maker.remaining);
             maker.remaining -= quantity;
             remaining -= quantity;
@@ -72,16 +79,17 @@ public final class OrderBook {
         int resting = 0;
         int cancelled = 0;
         if (remaining > 0) {
-            if (order.type() == OrderType.LIMIT) {
-                RestingOrder rest = new RestingOrder(order.orderId(), order.side(), order.priceCents(), remaining);
+            if (order.type() == OrderType.LIMIT && !selfTrade) {
+                RestingOrder rest = new RestingOrder(order.orderId(), order.side(), order.priceCents(), order.owner(),
+                        remaining);
                 bookFor(order.side()).computeIfAbsent(order.priceCents(), p -> new ArrayDeque<>()).addLast(rest);
                 restingById.put(order.orderId(), rest);
                 resting = remaining;
             } else {
-                cancelled = remaining; // market remainder never rests
+                cancelled = remaining; // market remainder never rests; a self-trade remainder never crosses its own order
             }
         }
-        return new MatchResult(order.orderId(), List.copyOf(fills), resting, cancelled);
+        return new MatchResult(order.orderId(), List.copyOf(fills), resting, cancelled, selfTrade);
     }
 
     /** Cancels a resting order. Returns the cancelled remaining quantity, or 0 if unknown/already gone. */

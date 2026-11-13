@@ -61,7 +61,7 @@ Java 21 · Spring Boot 4 · Spring Security (JWT) · Spring Data JPA · PostgreS
 7. Injury/news events and trading halts
 8. Live price streaming (WebSocket) + frontend ticker
 9. Leaderboards, position limits, wash-trading detection
-10. CI/CD and deployment
+10. CI/CD and one-command deployment
 
 ## Testing strategy
 
@@ -105,6 +105,24 @@ python3 scripts/live-demo.py injure "Avery Stone"
 When both games are final the slate settles on its own and the portfolio shows realized profit. To start over, reset the database with `docker compose down -v`.
 
 The browser gets everything over one WebSocket (STOMP at `/ws`): `/topic/slates/{id}` carries the ticker, game clocks and phase changes, `/topic/markets/{id}` the order book, trades, fair value and halts, and `/user/queue/fills` the signed-in user's own fills. Market data is public; trading needs the JWT from sign-in.
+
+### Deploy
+
+Everything (Postgres, Kafka, the exchange, the simulator and the frontend behind nginx) builds from source and starts with one command:
+
+```bash
+JWT_SECRET=$(openssl rand -hex 32) docker compose -f compose.prod.yaml up --build -d
+```
+
+Then open http://localhost:8088. Copy `.env.example` to `.env` to set the database password, operator usernames (who can open the surveillance page), and the demo slate. The simulator listens on localhost only because it can injure athletes in live markets; drive it from the host with `EXCHANGE_URL=http://localhost:8088 python3 scripts/live-demo.py start`. CI builds all three images on every pull request.
+
+### Trust and safety
+
+- **Position limits**: no trader may hold more than 250 shares of one athlete, counting open buy orders and IPO bids (`athletex.limits.max-position-shares`). The house market maker is exempt.
+- **Rate limits**: order entry is limited per user (bursts of 20, then 10 a second) and sign-in per address (10 a minute); excess requests get `429` with `Retry-After`. The buckets are in memory, so one instance; Redis is the next step for several.
+- **Self-trade prevention**: the matching engine never lets an order trade with the same account's resting order. It stops there and cancels the rest of the incoming order, and the attempt is recorded.
+- **Round-trip surveillance**: every minute, recent trades are scanned for two accounts trading one athlete back and forth while little changes hands net. Operators review and dismiss alerts on the Surveillance page; a dismissed alert reopens if the pattern continues.
+- **Privacy**: traders are anonymous on leaderboards and in the feed unless they choose otherwise; holdings are never shown to others.
 
 ### Backend only
 
